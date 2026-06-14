@@ -258,6 +258,111 @@ function diagnostics(config) {
   };
 }
 
+function redactSecret(value) {
+  return value ? "[redacted]" : "";
+}
+
+export function sanitizeConfigForSupport(config) {
+  return {
+    version: config.version,
+    server: config.server,
+    profileRoot: config.profileRoot,
+    userDataRootCount: Array.isArray(config.userDataRoots) ? config.userDataRoots.length : 0,
+    chromeAppName: config.chromeAppName,
+    proxyClient: config.proxyClient,
+    agent: {
+      mcpEnabled: config.agent?.mcpEnabled !== false
+    },
+    mihomo: {
+      controllerUrl: config.mihomo?.controllerUrl || "",
+      secret: redactSecret(config.mihomo?.secret),
+      mergePath: config.mihomo?.mergePath || "",
+      runtimePath: config.mihomo?.runtimePath || ""
+    },
+    embeddedMihomo: {
+      controllerUrl: config.embeddedMihomo?.controllerUrl || "",
+      secret: redactSecret(config.embeddedMihomo?.secret),
+      binaryPath: config.embeddedMihomo?.binaryPath || "",
+      configPath: config.embeddedMihomo?.configPath || "",
+      subscriptionUrl: config.embeddedMihomo?.subscriptionUrl ? "[redacted]" : "",
+      autoStart: Boolean(config.embeddedMihomo?.autoStart)
+    },
+    routes: Object.fromEntries(Object.entries(config.routes || {}).map(([key, route]) => [key, {
+      label: route.label,
+      startUrl: route.startUrl || "",
+      cdpPort: route.cdpPort,
+      proxyUrl: route.proxyUrl,
+      profileName: route.profileName,
+      hasUserDataDir: Boolean(route.userDataDir),
+      profileDirectory: route.profileDirectory || "Default",
+      hasBoundNode: Boolean(route.mihomoGroup)
+    }]))
+  };
+}
+
+function readRecentLogLines(logPath, maxLines = 120) {
+  if (!logPath || !existsSync(logPath)) return [];
+  try {
+    return readFileSync(logPath, "utf8").split(/\r?\n/).filter(Boolean).slice(-maxLines);
+  } catch {
+    return [];
+  }
+}
+
+export async function buildSupportBundle(config, { routeStatusImpl = routeStatus } = {}) {
+  const diagnosticInfo = diagnostics(config);
+  const routes = await routeStatusImpl(config);
+  return {
+    product: "MD-Browser",
+    generatedAt: new Date().toISOString(),
+    app: appInfo(),
+    diagnostics: diagnosticInfo,
+    config: sanitizeConfigForSupport(config),
+    routeSummary: Object.values(routes).map((route) => ({
+      key: route.key,
+      label: route.label,
+      cdpPort: route.cdpPort,
+      cdpReady: Boolean(route.cdpReady),
+      proxyPort: route.proxyPort,
+      proxyListening: Boolean(route.proxyListening),
+      nodeName: route.nodeName || "",
+      nodeValid: route.nodeStatus?.valid !== false,
+      nodeStatus: route.nodeStatus?.label || ""
+    })),
+    recentLogs: readRecentLogLines(diagnosticInfo.scriptLogPath)
+  };
+}
+
+export function compareVersions(left, right) {
+  const parse = (value) => String(value || "").replace(/^v/i, "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const a = parse(left);
+  const b = parse(right);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const diff = (a[index] || 0) - (b[index] || 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+export async function checkForUpdate({ currentVersion = appInfo().version, manifestUrl = process.env.MD_BROWSER_UPDATE_MANIFEST_URL || "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json", fetchImpl = fetch } = {}) {
+  if (!manifestUrl) return { configured: false, currentVersion, updateAvailable: false };
+  const response = await fetchImpl(manifestUrl, { signal: AbortSignal.timeout(5000) });
+  if (!response.ok) throw new Error(`更新清单读取失败: ${response.status}`);
+  const manifest = await response.json();
+  const latestVersion = manifest.version || "";
+  return {
+    configured: true,
+    currentVersion,
+    latestVersion,
+    updateAvailable: compareVersions(latestVersion, currentVersion) > 0,
+    manifestUrl,
+    downloadUrl: manifest.downloadUrl || "",
+    fileName: manifest.fileName || "",
+    sha256: manifest.sha256 || "",
+    notes: Array.isArray(manifest.notes) ? manifest.notes : []
+  };
+}
+
 async function routeNodeDelay(key, config) {
   const route = config.routes[key];
   if (!route) {
@@ -300,6 +405,16 @@ async function handleApi(req, res) {
 
   if (req.method === "GET" && url.pathname === "/api/diagnostics") {
     return sendJson(res, 200, diagnostics(config));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/support-bundle") {
+    return sendJson(res, 200, await buildSupportBundle(config));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/update-check") {
+    return sendJson(res, 200, await checkForUpdate({
+      manifestUrl: url.searchParams.get("manifestUrl") || undefined
+    }));
   }
 
   if (url.pathname.startsWith("/api/agent/") && config.agent?.mcpEnabled === false) {

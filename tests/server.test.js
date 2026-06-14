@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { autoRepairLaunchRoute, createAppServer, appInfo, enableEmbeddedMihomo, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, repairEmbeddedMihomo, safeReloadConfig } from "../src/server.js";
+import { autoRepairLaunchRoute, buildSupportBundle, checkForUpdate, compareVersions, createAppServer, appInfo, enableEmbeddedMihomo, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, repairEmbeddedMihomo, safeReloadConfig, sanitizeConfigForSupport } from "../src/server.js";
 import { defaultConfig, loadConfig, saveConfig } from "../src/config.js";
 
 test("appInfo reads package metadata for version display", () => {
@@ -209,6 +209,85 @@ test("diagnostics endpoint exposes local support paths", async () => {
     restoreHome(previousHome);
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("support bundle sanitizes secrets and summarizes routes", async () => {
+  const config = {
+    ...defaultConfig,
+    mihomo: {
+      ...defaultConfig.mihomo,
+      secret: "mihomo-secret"
+    },
+    embeddedMihomo: {
+      ...defaultConfig.embeddedMihomo,
+      secret: "embedded-secret",
+      subscriptionUrl: "https://example.com/private-sub"
+    },
+    routes: {
+      test: {
+        label: "Test",
+        cdpPort: 9222,
+        proxyUrl: "http://127.0.0.1:18101",
+        userDataDir: "~/Library/Application Support/MD-Browser/Profiles/Test",
+        profileDirectory: "Default",
+        mihomoGroup: "US Node"
+      }
+    }
+  };
+
+  const sanitized = sanitizeConfigForSupport(config);
+  assert.equal(sanitized.mihomo.secret, "[redacted]");
+  assert.equal(sanitized.embeddedMihomo.secret, "[redacted]");
+  assert.equal(sanitized.embeddedMihomo.subscriptionUrl, "[redacted]");
+  assert.equal(sanitized.routes.test.hasUserDataDir, true);
+
+  const bundle = await buildSupportBundle(config, {
+    routeStatusImpl: async () => ({
+      test: {
+        key: "test",
+        label: "Test",
+        cdpPort: 9222,
+        cdpReady: true,
+        proxyPort: 18101,
+        proxyListening: true,
+        nodeName: "US Node",
+        nodeStatus: { valid: true, label: "" }
+      }
+    })
+  });
+
+  assert.equal(bundle.product, "MD-Browser");
+  assert.equal(bundle.routeSummary[0].label, "Test");
+  assert.equal(bundle.routeSummary[0].cdpReady, true);
+});
+
+test("compareVersions and checkForUpdate detect newer release manifests", async () => {
+  assert.equal(compareVersions("0.3.0", "0.2.0"), 1);
+  assert.equal(compareVersions("0.2.0", "0.2.0"), 0);
+  assert.equal(compareVersions("0.1.9", "0.2.0"), -1);
+
+  const result = await checkForUpdate({
+    currentVersion: "0.2.0",
+    manifestUrl: "https://downloads.example.com/latest.json",
+    fetchImpl: async (url) => {
+      assert.equal(url, "https://downloads.example.com/latest.json");
+      return {
+        ok: true,
+        async json() {
+          return {
+            version: "0.3.0",
+            fileName: "MD-Browser-0.3.0-arm64.dmg",
+            downloadUrl: "https://downloads.example.com/MD-Browser-0.3.0-arm64.dmg",
+            sha256: "abc"
+          };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.updateAvailable, true);
+  assert.equal(result.latestVersion, "0.3.0");
+  assert.equal(result.fileName, "MD-Browser-0.3.0-arm64.dmg");
 });
 
 test("autoRepairLaunchRoute keeps the configured CDP port when it can launch safely", async () => {

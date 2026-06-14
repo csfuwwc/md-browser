@@ -1787,6 +1787,48 @@ function downloadExportJson() {
   pushActivity("success", "已下载团队配置 JSON");
 }
 
+function downloadJsonFile(value, fileName) {
+  const blob = new Blob([`${JSON.stringify(value, null, 2)}\n`], { type: "application/json;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+}
+
+async function downloadSupportBundle() {
+  const bundle = await api("/api/support-bundle");
+  const date = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  downloadJsonFile(bundle, `md-browser-support-${date}.json`);
+  pushActivity("success", "已导出排障包", "排障包已脱敏，可发给负责人定位问题。");
+}
+
+async function checkUpdates() {
+  const button = document.querySelector("#check-updates");
+  const previous = button.textContent;
+  button.disabled = true;
+  button.textContent = "检查中...";
+  try {
+    const result = await api("/api/update-check");
+    if (!result.configured) {
+      pushActivity("warn", "未配置更新地址", "需要设置 release manifest 地址后才能检查更新。");
+      return;
+    }
+    if (result.updateAvailable) {
+      pushActivity("success", "发现新版本", `当前 v${result.currentVersion}，最新 v${result.latestVersion}`);
+    } else {
+      pushActivity("success", "已是最新版本", `当前 v${result.currentVersion}`);
+    }
+  } catch (error) {
+    pushActivity("error", "检查更新失败", error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = previous;
+  }
+}
+
 function openImportDialog() {
   clearImportError();
   document.querySelector("#import-json-input").value = "";
@@ -2245,6 +2287,12 @@ document.querySelector("#choose-browser").addEventListener("click", openBrowserD
 document.querySelector("#close-browser-dialog").addEventListener("click", closeBrowserDialog);
 document.querySelector("#copy-mcp-url").addEventListener("click", () => {
   copyMcpUrl().catch((error) => pushActivity("error", "复制 MCP 地址失败", error.message));
+});
+document.querySelector("#check-updates").addEventListener("click", () => {
+  checkUpdates().catch((error) => pushActivity("error", "检查更新失败", error.message));
+});
+document.querySelector("#download-support-bundle").addEventListener("click", () => {
+  downloadSupportBundle().catch((error) => pushActivity("error", "导出排障包失败", error.message));
 });
 document.querySelector("#toggle-local-advanced").addEventListener("click", () => {
   const section = document.querySelector("#local-advanced-settings");

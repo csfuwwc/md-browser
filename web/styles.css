@@ -1428,6 +1428,18 @@ select {
   overflow-wrap: anywhere;
 }
 
+.settings-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings-card-actions .button {
+  min-height: 32px;
+  padding: 7px 10px;
+}
+
 .proxy-service-list {
   display: grid;
   gap: 8px;

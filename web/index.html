@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MD-Browser</title>
-    <link rel="stylesheet" href="/styles.css?v=93">
+    <link rel="stylesheet" href="/styles.css?v=94">
   </head>
   <body>
     <main class="shell">
@@ -262,6 +262,10 @@
                   <span>诊断信息</span>
                   <strong id="settings-diagnostics-config">~/.md-browser/config.json</strong>
                   <small id="settings-diagnostics-detail">日志与内置 Core 路径加载中</small>
+                  <div class="settings-card-actions">
+                    <button id="check-updates" class="button ghost" type="button">检查更新</button>
+                    <button id="download-support-bundle" class="button ghost" type="button">导出排障包</button>
+                  </div>
                 </div>
               </article>
             </div>
@@ -819,6 +823,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="/app.js?v=111"></script>
+    <script type="module" src="/app.js?v=112"></script>
   </body>
 </html>
