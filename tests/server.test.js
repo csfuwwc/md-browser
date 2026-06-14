@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { autoRepairLaunchRoute, buildSupportBundle, checkForUpdate, compareVersions, createAppServer, appInfo, enableEmbeddedMihomo, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, repairEmbeddedMihomo, safeReloadConfig, sanitizeConfigForSupport } from "../src/server.js";
+import { autoRepairLaunchRoute, buildSupportBundle, checkForUpdate, compareVersions, createAppServer, appInfo, defaultUpdateManifestUrl, enableEmbeddedMihomo, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, parseChangelogMarkdown, repairEmbeddedMihomo, resolveReleaseDownloadLink, safeReloadConfig, sanitizeConfigForSupport } from "../src/server.js";
 import { defaultConfig, loadConfig, saveConfig } from "../src/config.js";
 
 test("appInfo reads package metadata for version display", () => {
@@ -23,7 +23,9 @@ test("appInfo reads package metadata for version display", () => {
       name: "md-browser",
       productName: "MD-Browser",
       version: "0.2.3",
-      description: "Local browser routing"
+      description: "Local browser routing",
+      repositoryUrl: "",
+      issuesUrl: ""
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -44,7 +46,9 @@ test("appInfo falls back to MD-Browser product name in packaged app", () => {
       name: "md-browser",
       productName: "MD-Browser",
       version: "0.1.0",
-      description: "Local browser routing"
+      description: "Local browser routing",
+      repositoryUrl: "",
+      issuesUrl: ""
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -288,6 +292,101 @@ test("compareVersions and checkForUpdate detect newer release manifests", async 
   assert.equal(result.updateAvailable, true);
   assert.equal(result.latestVersion, "0.3.0");
   assert.equal(result.fileName, "MD-Browser-0.3.0-arm64.dmg");
+});
+
+test("checkForUpdate resolves relative download URLs against the manifest URL", async () => {
+  const result = await checkForUpdate({
+    currentVersion: "0.3.0",
+    manifestUrl: "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json",
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          version: "0.3.1",
+          fileName: "MD-Browser-0.3.1-arm64.dmg",
+          downloadUrl: "MD-Browser-0.3.1-arm64.dmg"
+        };
+      }
+    })
+  });
+
+  assert.equal(
+    result.downloadUrl,
+    "https://github.com/csfuwwc/md-browser/releases/latest/download/MD-Browser-0.3.1-arm64.dmg"
+  );
+});
+
+test("defaultUpdateManifestUrl derives GitHub latest download manifest", () => {
+  const dir = mkdtempSync(join(tmpdir(), "md-browser-update-manifest-"));
+  try {
+    const packagePath = join(dir, "package.json");
+    writeFileSync(packagePath, JSON.stringify({
+      repository: {
+        type: "git",
+        url: "git+https://github.com/csfuwwc/md-browser.git"
+      }
+    }));
+    assert.equal(
+      defaultUpdateManifestUrl({ packagePath }),
+      "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json"
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("parseChangelogMarkdown extracts versions sections and list items", () => {
+  const entries = parseChangelogMarkdown(`
+# Changelog
+
+## v0.3.0 - 2026-06-14
+
+### Added
+
+- One
+- Two
+
+### Fixed
+
+- Three
+`);
+
+  assert.deepEqual(entries, [
+    {
+      version: "v0.3.0",
+      date: "2026-06-14",
+      sections: [
+        { title: "Added", items: ["One", "Two"] },
+        { title: "Fixed", items: ["Three"] }
+      ]
+    }
+  ]);
+});
+
+test("resolveReleaseDownloadLink falls back to release page when asset is unavailable", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "md-browser-release-link-"));
+  try {
+    const packagePath = join(dir, "package.json");
+    writeFileSync(packagePath, JSON.stringify({
+      repository: {
+        type: "git",
+        url: "git+https://github.com/csfuwwc/md-browser.git"
+      }
+    }));
+    const result = await resolveReleaseDownloadLink({
+      version: "v0.3.0",
+      packagePath,
+      fetchImpl: async () => ({ ok: false })
+    });
+    assert.deepEqual(result, {
+      ok: true,
+      url: "https://github.com/csfuwwc/md-browser/releases/tag/v0.3.0",
+      fallbackUrl: "https://github.com/csfuwwc/md-browser/releases/tag/v0.3.0",
+      version: "v0.3.0"
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("autoRepairLaunchRoute keeps the configured CDP port when it can launch safely", async () => {

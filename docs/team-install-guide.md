@@ -4,17 +4,17 @@
 
 ## 你会收到什么
 
-- 安装包：`MD-Browser-0.3.0-arm64.dmg`
+- 安装包：`MD-Browser-0.3.1-arm64.dmg`
 - 版本清单：`MD-Browser-latest-mac-arm64.json`，负责人用于核对版本和文件校验，普通成员通常不需要打开
 - 适用设备：Apple Silicon / M 系列 Mac
-- 当前版本：`0.3.0`
-- 文件校验：152f4cad4402fd9b4ce3ccd274d04a685526d90e0639bf0ee3f25ed1d034946f
+- 当前版本：`0.3.1`
+- 文件校验：`8fbecbdd8f03fdd75f0c1a094be6cf718e0fbb5d8afd50a792636b29fef298b7`
 
-当前是未签名内测包，只适合内部验证。正式分发版本会做 Apple 签名和公证。
+当前是未签名内测包，只适合内部验证。内测包如果被 macOS 拦截，可以按下面步骤移除隔离标记后打开。正式分发版本会做 Apple 签名和公证。
 
 ## 安装
 
-1. 双击打开 `MD-Browser-0.3.0-arm64.dmg`。
+1. 双击打开 `MD-Browser-0.3.1-arm64.dmg`。
 2. 把 `MD-Browser.app` 拖到 `Applications`。
 3. 打开 `Applications` 里的 `MD-Browser`。
 
@@ -25,7 +25,7 @@
 3. 右键点击，选择“打开”。
 4. 在弹窗里再次确认“打开”。
 
-如果仍然被拦截，联系负责人处理。内测阶段可以用下面命令解除隔离标记：
+如果仍然被拦截，内测阶段可以用下面命令解除隔离标记：
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/MD-Browser.app

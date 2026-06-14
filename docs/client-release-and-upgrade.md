@@ -15,10 +15,10 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 ## 当前内测构建
 
-- 版本：`0.3.0`
+- 版本：`0.3.1`
 - 架构：Apple Silicon / arm64，适用于 M 系列 Mac
-- 本地安装包：`~/Downloads/MD-Browser-0.3.0-arm64.dmg`
-- SHA-256：`152f4cad4402fd9b4ce3ccd274d04a685526d90e0639bf0ee3f25ed1d034946f`
+- 本地安装包：`~/Downloads/MD-Browser-0.3.1-arm64.dmg`
+- SHA-256：`8fbecbdd8f03fdd75f0c1a094be6cf718e0fbb5d8afd50a792636b29fef298b7`
 - 构建时间：`2026-06-14 15:16 CST`
 - 签名状态：未签名、未公证，仅适合本机或内部临时验证
 - 已验证：测试通过；打包后需验证 DMG 校验和本地 `/api/status` 版本。
@@ -28,13 +28,13 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 ## 内测包安装方式
 
-当前 `package:mac` 输出的是未签名、未公证包，适合产品验证，不适合作为长期团队正式分发包。
+当前 `package:mac` 输出的是未签名、未公证包，适合产品验证，不适合作为长期团队正式分发包。未签名链路默认关闭 hardened runtime，目标是让包处于“可移除隔离后运行”的状态，而不是生成签名异常包。
 
 面向团队成员的简版说明见：[MD-Browser 团队内测安装与首次配置](team-install-guide.md)。
 
 安装步骤：
 
-1. 打开 `~/Downloads/MD-Browser-0.3.0-arm64.dmg`。
+1. 打开 `~/Downloads/MD-Browser-0.3.1-arm64.dmg`。
 2. 把 `MD-Browser.app` 拖到 `/Applications`。
 3. 如果 macOS 提示无法打开，先用访达右键 `MD-Browser.app` 选择“打开”。
 4. 如果仍被 Gatekeeper 拦截，内测阶段可以执行：
@@ -114,6 +114,20 @@ MD_BROWSER_RELEASE_NOTES='优化节点绑定|修复启动日志' \
 npm run release:manifest
 ```
 
+如果希望一次性把 manifest、发布说明和发布摘要都准备好，直接执行：
+
+```bash
+MD_BROWSER_RELEASE_BASE_URL=https://example.com/downloads \
+npm run release:prepare
+```
+
+会额外生成：
+
+```text
+dist/release-notes-v<version>.md
+dist/release-summary-v<version>.json
+```
+
 默认会读取当前版本的 `dist/MD-Browser-<version>-arm64.dmg`，生成：
 
 ```text
@@ -144,12 +158,12 @@ dist/latest-mac-arm64.json
 ```json
 {
   "productName": "MD-Browser",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "channel": "internal",
   "platform": "mac",
   "arch": "arm64",
-  "fileName": "MD-Browser-0.3.0-arm64.dmg",
-  "downloadUrl": "https://example.com/MD-Browser-0.3.0-arm64.dmg",
+  "fileName": "MD-Browser-0.3.1-arm64.dmg",
+  "downloadUrl": "https://example.com/MD-Browser-0.3.1-arm64.dmg",
   "sha256": "....",
   "size": 123456789,
   "generatedAt": "2026-06-12T07:30:00.000Z",
@@ -160,7 +174,7 @@ dist/latest-mac-arm64.json
 
 如果远端版本高于本地版本，客户端会在“设置”的诊断信息卡片里提示“发现新版本”。这个阶段不在客户端内自动替换 App，风险低。
 
-`v0.3.0` 已实现这个阶段的基础接口和按钮：
+`v0.3.1` 已实现这个阶段的基础接口和按钮：
 
 - `GET /api/update-check`：读取 release manifest，判断是否有新版。
 - “检查更新”按钮：在页面运行日志里显示结果。
@@ -168,7 +182,7 @@ dist/latest-mac-arm64.json
 
 ## 排障包策略
 
-`v0.3.0` 起，设置页支持导出排障包。排障包用于团队成员遇到问题时发给负责人定位，不需要用户打开本机配置文件。
+`v0.3.1` 起，设置页支持导出排障包。排障包用于团队成员遇到问题时发给负责人定位，不需要用户打开本机配置文件。
 
 排障包包含：
 

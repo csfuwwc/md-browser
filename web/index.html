@@ -158,6 +158,16 @@
                 </button>
               </div>
             </div>
+            <div id="route-issue-banner" class="route-issue-banner" hidden>
+              <div class="route-issue-banner-copy">
+                <strong id="route-issue-banner-title">存在需要处理的节点绑定</strong>
+                <span id="route-issue-banner-detail">部分浏览器配置绑定的节点已失效，需要重新选择可用节点。</span>
+              </div>
+              <div class="route-issue-banner-actions">
+                <button id="route-filter-node-issues" class="button ghost" type="button">只看异常</button>
+                <button id="route-clear-filters" class="button ghost" type="button">查看全部</button>
+              </div>
+            </div>
             <section id="routes" class="route-list" aria-label="browser environments"></section>
           </section>
         </section>
@@ -231,43 +241,30 @@
                 <p class="eyebrow">Settings</p>
                 <h3>系统设置</h3>
               </div>
-              <span class="panel-note">本地浏览器、配置存储和诊断路径</span>
             </div>
-            <div class="settings-grid">
-              <article class="settings-card">
-                <span class="settings-card-icon">
-                  <span class="rail-glyph rail-icon-dashboard" aria-hidden="true"></span>
-                </span>
-                <div class="settings-card-copy">
-                  <span>本地服务</span>
-                  <strong id="settings-service-state">检测中</strong>
-                  <small id="settings-service-url">http://127.0.0.1:18777</small>
-                </div>
-              </article>
-              <article class="settings-card">
-                <span class="settings-card-icon">
-                  <span class="rail-glyph rail-icon-identity" aria-hidden="true"></span>
-                </span>
-                <div class="settings-card-copy">
-                  <span>配置存储</span>
-                  <strong id="settings-config-location">~/.md-browser/config.json</strong>
-                  <small><span id="settings-root-count">0</span> 个目录池</small>
-                </div>
-              </article>
-              <article class="settings-card settings-card-wide">
-                <span class="settings-card-icon">
-                  <span class="rail-glyph rail-icon-activity" aria-hidden="true"></span>
-                </span>
-                <div class="settings-card-copy">
-                  <span>诊断信息</span>
-                  <strong id="settings-diagnostics-config">~/.md-browser/config.json</strong>
-                  <small id="settings-diagnostics-detail">日志与内置 Core 路径加载中</small>
-                  <div class="settings-card-actions">
-                    <button id="check-updates" class="button ghost" type="button">检查更新</button>
-                    <button id="download-support-bundle" class="button ghost" type="button">导出排障包</button>
+            <div class="settings-form-section version-info-section">
+              <div class="settings-form-heading">
+                <strong>版本信息</strong>
+                <span>检查新版本、查看更新记录和导出排障包。</span>
+              </div>
+              <div class="version-summary">
+                <div class="version-summary-main">
+                  <span class="version-summary-icon">
+                    <span class="rail-glyph rail-icon-activity" aria-hidden="true"></span>
+                  </span>
+                  <div class="version-summary-copy">
+                    <strong id="settings-version-value">MD-Browser</strong>
+                    <small id="settings-version-detail">v0.3.1</small>
+                    <small id="settings-version-status">最近未检查更新</small>
                   </div>
                 </div>
-              </article>
+                <div class="version-summary-actions">
+                  <button id="check-updates" class="button ghost" type="button">检查更新</button>
+                  <button id="view-changelog" class="button ghost" type="button">查看更新记录</button>
+                  <button id="open-feedback-issues" class="button ghost" type="button">反馈意见</button>
+                  <button id="download-support-bundle" class="button ghost" type="button">导出排障包</button>
+                </div>
+              </div>
             </div>
             <form id="settings-form" class="settings-form">
               <div id="proxy-settings-section" class="settings-form-section">
@@ -329,7 +326,7 @@
                     </div>
                     <div class="proxy-client-actions">
                       <button id="toggle-embedded-mihomo" class="button primary" type="button">启动</button>
-                      <button id="configure-embedded-subscription" class="button ghost" type="button">一键配置</button>
+                      <button id="configure-embedded-subscription" class="button ghost" type="button">配置订阅源</button>
                       <button id="repair-embedded-mihomo" class="button ghost" type="button">一键修复</button>
                       <button id="toggle-embedded-advanced" class="button ghost" type="button" aria-expanded="false">高级设置</button>
                     </div>
@@ -376,18 +373,32 @@
                   </div>
                 </div>
                 <div id="local-advanced-settings" class="local-advanced-settings" hidden>
-                  <label class="settings-field">
-                    <span>浏览器应用名称</span>
-                    <input id="settings-chrome-app-name" type="text" placeholder="Google Chrome">
-                  </label>
-                  <label class="settings-field">
-                    <span>页面服务端口</span>
-                    <input id="settings-server-port" type="number" min="1" max="65535" placeholder="18777">
-                  </label>
+                  <input id="settings-chrome-app-name" type="hidden" value="Google Chrome">
+                  <div class="mcp-endpoint-card wide">
+                    <div>
+                      <strong>本地页面地址</strong>
+                      <small>客户端启动后会自动使用这个地址打开管理页面。</small>
+                    </div>
+                    <div class="mcp-endpoint-row">
+                      <input id="settings-local-url" type="text" readonly value="http://127.0.0.1:18777">
+                      <button id="copy-local-url" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="复制本地页面地址" data-tooltip="复制地址">
+                        <span class="json-button-icon json-button-icon-copy" aria-hidden="true"></span>
+                      </button>
+                    </div>
+                  </div>
                   <label class="settings-field wide">
                     <span>默认独立身份目录</span>
                     <input id="settings-profile-root" type="text" placeholder="~/Library/Application Support/MD-Browser/Profiles">
                   </label>
+                  <details class="settings-inline-advanced wide">
+                    <summary>更多本地参数</summary>
+                    <div class="settings-inline-advanced-grid">
+                      <label class="settings-field">
+                        <span>页面服务端口</span>
+                        <input id="settings-server-port" type="number" min="1" max="65535" placeholder="18777">
+                      </label>
+                    </div>
+                  </details>
                 </div>
               </div>
 
@@ -408,12 +419,12 @@
                 </label>
                 <div class="mcp-endpoint-card wide">
                   <div>
-                    <strong>HTTP MCP 地址</strong>
-                    <small>在 Codex 里按 URL 方式添加本地 MCP 服务。</small>
+                    <strong>MCP 安装话术</strong>
+                    <small>把这段话发给你的 Agent 即可。</small>
                   </div>
                   <div class="mcp-endpoint-row">
-                    <input id="settings-mcp-url" type="text" readonly value="http://127.0.0.1:18777/mcp">
-                    <button id="copy-mcp-url" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="复制 MCP 地址" data-tooltip="复制地址">
+                    <input id="settings-mcp-message" type="text" readonly value="请安装这个 MCP：http://127.0.0.1:18777/mcp">
+                    <button id="copy-mcp-message" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="复制 MCP 安装话术" data-tooltip="复制话术">
                       <span class="json-button-icon json-button-icon-copy" aria-hidden="true"></span>
                     </button>
                   </div>
@@ -448,6 +459,15 @@
                   <span class="activity-count-badge">最近 200 条</span>
                 </div>
                 <p class="activity-toolbar-description">记录启动、保存、刷新和错误信息，按时间倒序显示。</p>
+                <div id="activity-category-filters" class="activity-category-filters" role="group" aria-label="日志分类筛选">
+                  <button class="activity-filter-chip active" type="button" data-category="all">全部</button>
+                  <button class="activity-filter-chip" type="button" data-category="system">系统</button>
+                  <button class="activity-filter-chip" type="button" data-category="browser">浏览器</button>
+                  <button class="activity-filter-chip" type="button" data-category="proxy">代理</button>
+                  <button class="activity-filter-chip" type="button" data-category="config">配置</button>
+                  <button class="activity-filter-chip" type="button" data-category="update">更新</button>
+                  <button class="activity-filter-chip" type="button" data-category="agent">Agent</button>
+                </div>
               </div>
             </div>
             <div class="activity-log-header" aria-hidden="true">
@@ -823,6 +843,50 @@
       </form>
     </dialog>
 
-    <script type="module" src="/app.js?v=112"></script>
+    <dialog id="update-dialog">
+      <form class="dialog-card guide-dialog-card update-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>版本更新</h3>
+          </div>
+          <button id="close-update-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <section id="update-result" class="update-result-panel">
+          <div class="empty-state">
+            <strong>等待检查</strong>
+            <span>点击“检查更新”后，这里会显示版本结果。</span>
+          </div>
+        </section>
+        <div class="dialog-actions">
+          <button id="open-changelog-from-update" class="button ghost" value="cancel" type="button">查看更新记录</button>
+          <div class="dialog-action-group">
+            <button id="open-update-download" class="button primary" value="default" type="button" hidden>前往下载</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="changelog-dialog">
+      <form class="dialog-card json-dialog-card changelog-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>更新记录</h3>
+          </div>
+          <button id="close-changelog-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="changelog-list" class="changelog-list">
+          <div class="empty-state">
+            <strong>正在读取更新记录</strong>
+            <span>稍后会展示每个版本的变更内容。</span>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/app.js?v=113"></script>
   </body>
 </html>

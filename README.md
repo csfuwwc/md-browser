@@ -70,6 +70,13 @@ Unsigned local package:
 npm run package:mac
 ```
 
+If macOS blocks the unsigned build during internal testing, remove the quarantine flag and reopen the app:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/MD-Browser.app
+open /Applications/MD-Browser.app
+```
+
 Signed package flow:
 
 ```bash
@@ -81,6 +88,14 @@ Release manifest generation:
 
 ```bash
 MD_BROWSER_RELEASE_MANIFEST_COPY=~/Downloads/MD-Browser-latest-mac-arm64.json npm run release:manifest
+```
+
+Release bundle preparation:
+
+```bash
+npm run package:mac
+MD_BROWSER_RELEASE_BASE_URL=https://github.com/csfuwwc/md-browser/releases/latest/download \
+npm run release:prepare
 ```
 
 More packaging and upgrade notes live in [docs/client-release-and-upgrade.md](docs/client-release-and-upgrade.md).

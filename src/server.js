@@ -347,22 +347,131 @@ export function compareVersions(left, right) {
   return 0;
 }
 
-export async function checkForUpdate({ currentVersion = appInfo().version, manifestUrl = process.env.MD_BROWSER_UPDATE_MANIFEST_URL || "", fetchImpl = fetch } = {}) {
-  if (!manifestUrl) return { configured: false, currentVersion, updateAvailable: false };
-  const response = await fetchImpl(manifestUrl, { signal: AbortSignal.timeout(5000) });
+export function defaultUpdateManifestUrl({ packagePath = join(rootDir, "package.json") } = {}) {
+  try {
+    const parsed = JSON.parse(readFileSync(packagePath, "utf8"));
+    const source = String(parsed.repository?.url || parsed.homepage || "").trim()
+      .replace(/^git\+/, "")
+      .replace(/\.git$/i, "");
+    const match = source.match(/github\.com\/([^/]+)\/([^/#]+)/i);
+    if (!match) return "";
+    const [, owner, repo] = match;
+    return `https://github.com/${owner}/${repo}/releases/latest/download/latest-mac-arm64.json`;
+  } catch {
+    return "";
+  }
+}
+
+export async function checkForUpdate({
+  currentVersion = appInfo().version,
+  manifestUrl = process.env.MD_BROWSER_UPDATE_MANIFEST_URL || "",
+  packagePath = join(rootDir, "package.json"),
+  fetchImpl = fetch
+} = {}) {
+  const resolvedManifestUrl = manifestUrl || defaultUpdateManifestUrl({ packagePath });
+  if (!resolvedManifestUrl) return { configured: false, currentVersion, updateAvailable: false };
+  const response = await fetchImpl(resolvedManifestUrl, { signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error(`更新清单读取失败: ${response.status}`);
   const manifest = await response.json();
   const latestVersion = manifest.version || "";
+  const resolvedDownloadUrl = resolveManifestDownloadUrl(manifest.downloadUrl || "", resolvedManifestUrl);
   return {
     configured: true,
     currentVersion,
     latestVersion,
     updateAvailable: compareVersions(latestVersion, currentVersion) > 0,
-    manifestUrl,
-    downloadUrl: manifest.downloadUrl || "",
+    manifestUrl: resolvedManifestUrl,
+    downloadUrl: resolvedDownloadUrl,
     fileName: manifest.fileName || "",
     sha256: manifest.sha256 || "",
     notes: Array.isArray(manifest.notes) ? manifest.notes : []
+  };
+}
+
+function resolveManifestDownloadUrl(downloadUrl, manifestUrl) {
+  if (!downloadUrl) return "";
+  try {
+    return new URL(downloadUrl, manifestUrl).toString();
+  } catch {
+    return downloadUrl;
+  }
+}
+
+export function parseChangelogMarkdown(markdown = "") {
+  const entries = [];
+  let currentEntry = null;
+  let currentSection = null;
+  for (const rawLine of String(markdown).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const entryMatch = line.match(/^##\s+(v[^\s]+)(?:\s*-\s*(.+))?$/i);
+    if (entryMatch) {
+      currentEntry = {
+        version: entryMatch[1],
+        date: entryMatch[2] || "",
+        sections: []
+      };
+      entries.push(currentEntry);
+      currentSection = null;
+      continue;
+    }
+    const sectionMatch = line.match(/^###\s+(.+)$/);
+    if (sectionMatch && currentEntry) {
+      currentSection = {
+        title: sectionMatch[1],
+        items: []
+      };
+      currentEntry.sections.push(currentSection);
+      continue;
+    }
+    const itemMatch = line.match(/^-\s+(.+)$/);
+    if (itemMatch && currentSection) {
+      currentSection.items.push(itemMatch[1]);
+    }
+  }
+  return entries;
+}
+
+function normalizeVersionTag(version = "") {
+  const value = String(version || "").trim();
+  if (!value) return "";
+  return value.startsWith("v") ? value : `v${value}`;
+}
+
+function repositoryBaseUrl({ packagePath = join(rootDir, "package.json") } = {}) {
+  return String(appInfo({ packagePath }).repositoryUrl || "")
+    .trim()
+    .replace(/^git\+/, "")
+    .replace(/\.git$/i, "")
+    .replace(/#.*$/, "");
+}
+
+export async function resolveReleaseDownloadLink({
+  version,
+  packagePath = join(rootDir, "package.json"),
+  fetchImpl = fetch
+} = {}) {
+  const baseUrl = repositoryBaseUrl({ packagePath });
+  const tag = normalizeVersionTag(version);
+  const rawVersion = tag.replace(/^v/i, "");
+  if (!baseUrl || !tag || !rawVersion) {
+    return { ok: false, url: "", fallbackUrl: "", version: tag };
+  }
+  const releasePageUrl = `${baseUrl}/releases/tag/${tag}`;
+  const assetUrl = `${baseUrl}/releases/download/${tag}/MD-Browser-${rawVersion}-arm64.dmg`;
+  try {
+    const response = await fetchImpl(assetUrl, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(5000) });
+    if (response.ok) {
+      return { ok: true, url: assetUrl, fallbackUrl: releasePageUrl, version: tag };
+    }
+  } catch {}
+  return { ok: true, url: releasePageUrl, fallbackUrl: releasePageUrl, version: tag };
+}
+
+function changelogInfo() {
+  const markdown = readFileSync(join(rootDir, "CHANGELOG.md"), "utf8");
+  return {
+    markdown,
+    entries: parseChangelogMarkdown(markdown)
   };
 }
 
@@ -417,6 +526,16 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/update-check") {
     return sendJson(res, 200, await checkForUpdate({
       manifestUrl: url.searchParams.get("manifestUrl") || undefined
+    }));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/changelog") {
+    return sendJson(res, 200, changelogInfo());
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/release-link") {
+    return sendJson(res, 200, await resolveReleaseDownloadLink({
+      version: url.searchParams.get("version") || ""
     }));
   }
 
@@ -930,11 +1049,17 @@ function delay(ms) {
 export function appInfo({ packagePath = join(rootDir, "package.json") } = {}) {
   const parsed = JSON.parse(readFileSync(packagePath, "utf8"));
   const productName = parsed.build?.productName || parsed.productName || (parsed.name === "md-browser" ? "MD-Browser" : parsed.name) || "";
+  const repositoryUrl = String(parsed.repository?.url || parsed.homepage || "")
+    .trim()
+    .replace(/^git\+/, "")
+    .replace(/\.git$/i, "");
   return {
     name: parsed.name || "",
     productName,
     version: parsed.version || "",
-    description: parsed.description || ""
+    description: parsed.description || "",
+    repositoryUrl,
+    issuesUrl: parsed.bugs?.url || ""
   };
 }
 

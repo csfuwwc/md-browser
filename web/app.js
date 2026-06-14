@@ -8,12 +8,14 @@ let routeSearchQuery = "";
 let routeStateFilter = "all";
 const ROUTE_VIEW_MODE_KEY = "md-browser.routeViewMode";
 const LEGACY_ROUTE_VIEW_MODE_KEY = "tk-browser-router.routeViewMode";
+const GUIDE_DISMISSED_KEY = "md-browser.guideDismissed.v1";
 let routeViewMode = loadRouteViewMode();
 let activityLog = [];
 let pendingLaunchKeys = new Set();
 let pendingNodeDelayKeys = new Set();
 let nodeDelayResults = new Map();
 let activityFilterLabel = "全部日志";
+let activityCategoryFilter = "all";
 let serviceState = "checking";
 let createValidationTouched = false;
 let rootDialogMode = "discover";
@@ -28,6 +30,9 @@ let embeddedStalePidNoticeShown = false;
 let currentEmbeddedMihomoStatus = null;
 let currentAppInfo = null;
 let proxyOperationState = { external: "", embedded: "" };
+let latestUpdateResult = null;
+let changelogEntries = [];
+let updateAutoCheckInFlight = false;
 
 const PAGE_META = {
   dashboard: { eyebrow: "Local Browser Router", title: "仪表盘" },
@@ -152,7 +157,6 @@ function renderUserDataRoots() {
   const container = document.querySelector("#user-data-roots");
   const countNode = document.querySelector("#user-data-root-count");
   countNode.textContent = `${userDataRoots.length} 个目录池`;
-  document.querySelector("#settings-root-count").textContent = userDataRoots.length;
   if (!userDataRoots.length) {
     container.innerHTML = "<div class=\"empty-state\"><strong>未配置目录池</strong><span>添加一个 Chrome user-data-dir 父目录或具体 user-data-dir。</span></div>";
     return;
@@ -169,8 +173,19 @@ function renderDashboardAlerts(routes) {
   const container = document.querySelector("#dashboard-alerts");
   const panel = container.closest(".dashboard-events-panel");
   const alerts = [];
+  const routeValues = Object.values(routes);
 
-  for (const route of Object.values(routes)) {
+  if (latestUpdateResult?.updateAvailable) {
+    alerts.push({
+      tone: "warn",
+      title: `发现新版本 v${latestUpdateResult.latestVersion}`,
+      detail: `当前版本 v${latestUpdateResult.currentVersion || currentAppInfo?.version || "-"}`,
+      targetPage: "settings",
+      actionLabel: "去更新"
+    });
+  }
+
+  for (const route of routeValues) {
     const state = routeState(route);
     if (!route.nodeName) {
       alerts.push({
@@ -195,6 +210,18 @@ function renderDashboardAlerts(routes) {
         actionLabel: hasProxyIssue ? "代理设置" : "检查配置"
       });
     }
+  }
+
+  const nodeIssueCount = routeValues.filter((route) => route.nodeStatus?.valid === false && route.nodeName).length;
+  if (nodeIssueCount > 0) {
+    alerts.unshift({
+      tone: "error",
+      title: `有 ${nodeIssueCount} 条配置节点失效`,
+      detail: "通常是切换订阅后节点名变化，重新绑定一次即可恢复。",
+      targetPage: "routes",
+      actionLabel: "去处理",
+      action: "jump"
+    });
   }
 
   if (!alerts.length) {
@@ -301,26 +328,49 @@ function syncPageFromHash() {
 }
 
 function renderSettingsBasics(app = currentAppInfo) {
-  const serviceUrl = document.querySelector("#settings-service-url");
-  if (serviceUrl) {
-    const version = app?.version ? ` · v${app.version}` : "";
-    serviceUrl.textContent = `${window.location.origin}${version}`;
+  const versionNode = document.querySelector("#settings-version-value");
+  const versionDetailNode = document.querySelector("#settings-version-detail");
+  const localUrlNode = document.querySelector("#settings-local-url");
+  if (versionNode) {
+    versionNode.textContent = "MD-Browser";
   }
-  const mcpUrl = document.querySelector("#settings-mcp-url");
-  if (mcpUrl) mcpUrl.value = `${window.location.origin}/mcp`;
+  if (versionDetailNode) {
+    versionDetailNode.textContent = app?.version ? `v${app.version}` : "未读取到版本号";
+  }
+  if (localUrlNode) {
+    localUrlNode.value = window.location.origin;
+  }
+  const mcpMessage = document.querySelector("#settings-mcp-message");
+  if (mcpMessage) mcpMessage.value = `请安装这个 MCP：${window.location.origin}/mcp`;
+  renderVersionStatus();
 }
 
 function renderDiagnostics(data) {
-  const configNode = document.querySelector("#settings-diagnostics-config");
-  const detailNode = document.querySelector("#settings-diagnostics-detail");
-  if (!configNode || !detailNode || !data) return;
-  configNode.textContent = data.configPath || "~/.md-browser/config.json";
-  const parts = [
-    data.scriptLogPath ? `日志 ${data.scriptLogPath}` : "",
-    data.embeddedMihomo?.binaryPath ? `Core ${data.embeddedMihomo.binaryPath}` : "",
-    data.embeddedMihomo?.configPath ? `内置配置 ${data.embeddedMihomo.configPath}` : ""
-  ].filter(Boolean);
-  detailNode.textContent = parts.join(" · ") || "暂无诊断路径";
+  const versionDetailNode = document.querySelector("#settings-version-detail");
+  if (!versionDetailNode || !data) return;
+  if (!currentAppInfo?.version) versionDetailNode.textContent = "未读取到版本号";
+}
+
+function renderVersionStatus(result = latestUpdateResult) {
+  const node = document.querySelector("#settings-version-status");
+  if (!node) return;
+  if (!result) {
+    node.dataset.tone = "";
+    node.textContent = "";
+    return;
+  }
+  if (result.error) {
+    node.dataset.tone = "error";
+    node.textContent = "检查更新失败";
+    return;
+  }
+  if (result.updateAvailable) {
+    node.dataset.tone = "info";
+    node.textContent = `发现新版本 v${result.latestVersion}`;
+    return;
+  }
+  node.dataset.tone = result.configured === false ? "warn" : "success";
+  node.textContent = result.configured === false ? "未配置更新源" : "";
 }
 
 function renderSettingsForm(config) {
@@ -375,7 +425,89 @@ function syncEmbeddedSubscriptionInputs(source) {
 function renderEmbeddedSubscriptionPlacement() {
   const button = document.querySelector("#configure-embedded-subscription");
   if (!button) return;
-  button.textContent = embeddedSubscriptionValue() ? "修改订阅" : "一键配置";
+  button.textContent = embeddedSubscriptionValue() ? "切换订阅源" : "配置订阅源";
+}
+
+function repositoryBaseUrl() {
+  return String(currentAppInfo?.repositoryUrl || "")
+    .trim()
+    .replace(/^git\+/, "")
+    .replace(/\.git$/i, "")
+    .replace(/#.*$/, "");
+}
+
+function issueFeedbackUrl() {
+  return String(currentAppInfo?.issuesUrl || "").trim() || `${repositoryBaseUrl()}/issues`;
+}
+
+function normalizeVersionLabel(version) {
+  const value = String(version || "").trim();
+  if (!value) return "";
+  return value.startsWith("v") ? value : `v${value}`;
+}
+
+function releaseDownloadUrl(version) {
+  const base = repositoryBaseUrl();
+  const rawVersion = String(version || "").trim().replace(/^v/i, "");
+  if (!base || !rawVersion) return "";
+  return `${base}/releases/download/${normalizeVersionLabel(rawVersion)}/MD-Browser-${rawVersion}-arm64.dmg`;
+}
+
+function markGuideDismissed() {
+  localStorage.setItem(GUIDE_DISMISSED_KEY, "1");
+}
+
+function shouldOpenGuideOnboarding({ routes = currentRoutes, roots = userDataRoots, nodes = mihomoNodes, config = currentConfig } = {}) {
+  if (localStorage.getItem(GUIDE_DISMISSED_KEY) === "1") return false;
+  const routeValues = Object.values(routes || {});
+  const proxyReady = currentProxyMode(config) !== "none" && Array.isArray(nodes) && nodes.length > 0;
+  return !proxyReady || !roots.length || !routeValues.length;
+}
+
+function saveLatestUpdateResult(result) {
+  latestUpdateResult = result || null;
+  renderVersionStatus(latestUpdateResult);
+}
+
+async function maybeAutoCheckUpdates() {
+  if (updateAutoCheckInFlight || latestUpdateResult) return;
+  updateAutoCheckInFlight = true;
+  try {
+    const result = await api("/api/update-check");
+    saveLatestUpdateResult(result);
+    renderDashboardAlerts(currentRoutes);
+  } catch (error) {
+    saveLatestUpdateResult({ error: error.message });
+  } finally {
+    updateAutoCheckInFlight = false;
+  }
+}
+
+function openGuideIfNeeded() {
+  if (!shouldOpenGuideOnboarding()) return;
+  window.setTimeout(() => {
+    if (currentPage === "dashboard") {
+      document.querySelector("#guide-dialog")?.showModal();
+    }
+  }, 180);
+}
+
+async function openVersionDownload(version) {
+  const tag = String(version || "").trim();
+  if (!tag) return;
+  try {
+    const result = await api(`/api/release-link?version=${encodeURIComponent(tag)}`);
+    const url = result.url || "";
+    if (!url) throw new Error("未生成可用下载地址");
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch (error) {
+    const fallback = releaseDownloadUrl(tag);
+    if (fallback) {
+      window.open(fallback, "_blank", "noopener,noreferrer");
+      return;
+    }
+    pushActivity("error", "打开版本下载失败", error.message);
+  }
 }
 
 function openEmbeddedSubscriptionDialog() {
@@ -1049,6 +1181,7 @@ function setCreateAdvancedExpanded(expanded) {
 
 function renderRoutes(routes) {
   currentRoutes = routes;
+  renderRouteIssueBanner(routes);
   const container = document.querySelector("#routes");
   const template = document.querySelector("#route-card-template");
   container.innerHTML = "";
@@ -1122,6 +1255,28 @@ function renderRoutes(routes) {
 
     container.appendChild(row);
   }
+}
+
+function renderRouteIssueBanner(routes = currentRoutes) {
+  const banner = document.querySelector("#route-issue-banner");
+  if (!banner) return;
+  const routeValues = Object.values(routes || {});
+  const invalid = routeValues.filter((route) => route.nodeStatus?.valid === false && route.nodeName);
+  const unbound = routeValues.filter((route) => !route.nodeName);
+  const title = document.querySelector("#route-issue-banner-title");
+  const detail = document.querySelector("#route-issue-banner-detail");
+  if (!invalid.length && !unbound.length) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  if (invalid.length) {
+    title.textContent = `${invalid.length} 条浏览器配置需要重新绑定节点`;
+    detail.textContent = "检测到已绑定节点不存在或不可用，常见于订阅切换后节点名发生变化。";
+    return;
+  }
+  title.textContent = `${unbound.length} 条浏览器配置还未绑定节点`;
+  detail.textContent = "未绑定节点的配置可以启动浏览器，但不会自动切到指定线路。";
 }
 
 function routeNodeDelayKey(route) {
@@ -1548,7 +1703,6 @@ async function refresh(options = {}) {
     renderSettingsForm(data.config);
     userDataRoots = profileData.userDataRoots || [];
     userDataDirOptions = profileData.userDataDirs || [];
-    document.querySelector("#settings-config-location").textContent = "~/.md-browser/config.json";
     renderUserDataRoots();
     await renderMihomoNodes();
     renderStatusSummary(data.routes);
@@ -1556,6 +1710,9 @@ async function refresh(options = {}) {
     renderRoutes(data.routes);
     renderDashboardActivityPreview();
     renderGuideReadiness({ routes: data.routes, config: data.config, roots: userDataRoots, nodes: mihomoNodes });
+    renderVersionStatus(latestUpdateResult);
+    maybeAutoCheckUpdates().catch(() => {});
+    openGuideIfNeeded();
     return data;
   } catch (error) {
     updateServiceState("offline", error.message, { logTransition: logServiceTransition });
@@ -1722,6 +1879,7 @@ function openGuideDialog() {
 }
 
 function closeGuideDialog() {
+  markGuideDismissed();
   document.querySelector("#guide-dialog").close();
 }
 
@@ -1753,12 +1911,12 @@ async function copyExportJson() {
   pushActivity("success", "已复制团队配置 JSON");
 }
 
-async function copyMcpUrl() {
-  const input = document.querySelector("#settings-mcp-url");
+async function copyInputValue(selector, successTitle) {
+  const input = document.querySelector(selector);
   const value = input?.value.trim();
   if (!value) return;
   await copyTextValue(value, input);
-  pushActivity("success", "已复制 MCP 地址", value);
+  pushActivity("success", successTitle, value);
 }
 
 async function copyTextValue(value, fallbackInput = null) {
@@ -1812,6 +1970,9 @@ async function checkUpdates() {
   button.textContent = "检查中...";
   try {
     const result = await api("/api/update-check");
+    saveLatestUpdateResult(result);
+    renderUpdateDialog(latestUpdateResult);
+    openUpdateDialog();
     if (!result.configured) {
       pushActivity("warn", "未配置更新地址", "需要设置 release manifest 地址后才能检查更新。");
       return;
@@ -1821,12 +1982,166 @@ async function checkUpdates() {
     } else {
       pushActivity("success", "已是最新版本", `当前 v${result.currentVersion}`);
     }
+    renderDashboardAlerts(currentRoutes);
   } catch (error) {
+    saveLatestUpdateResult({ error: error.message });
+    renderUpdateDialog(latestUpdateResult);
+    openUpdateDialog();
     pushActivity("error", "检查更新失败", error.message);
   } finally {
     button.disabled = false;
     button.textContent = previous;
   }
+}
+
+function openUpdateDialog() {
+  document.querySelector("#update-dialog").showModal();
+}
+
+function closeUpdateDialog() {
+  document.querySelector("#update-dialog").close();
+}
+
+function renderUpdateDialog(result = {}) {
+  const container = document.querySelector("#update-result");
+  const downloadButton = document.querySelector("#open-update-download");
+  if (!container || !downloadButton) return;
+
+  if (result.error) {
+    downloadButton.hidden = true;
+    downloadButton.dataset.url = "";
+    container.innerHTML = `
+      <article class="update-status-card">
+        <div class="update-status-topline">
+          <strong>检查更新失败</strong>
+          <span class="update-status-badge" data-tone="error">未完成</span>
+        </div>
+        <p>${escapeHtml(result.error)}</p>
+      </article>
+    `;
+    return;
+  }
+
+  const configured = result.configured !== false;
+  const tone = !configured ? "warn" : result.updateAvailable ? "info" : "success";
+  const statusText = !configured
+    ? "未配置"
+    : result.updateAvailable
+      ? "发现新版本"
+      : "已是最新";
+  const summary = !configured
+    ? "当前还没有可用的版本清单地址。"
+    : result.updateAvailable
+      ? `检测到可更新版本 v${result.latestVersion}。`
+      : `当前客户端 v${result.currentVersion} 已是最新版本。`;
+  const notes = Array.isArray(result.notes) ? result.notes.filter(Boolean) : [];
+
+  downloadButton.hidden = !(result.updateAvailable && result.downloadUrl);
+  downloadButton.dataset.url = result.downloadUrl || "";
+
+  container.innerHTML = `
+    <article class="update-status-card">
+      <div class="update-status-topline">
+        <strong>${escapeHtml(statusText)}</strong>
+        <span class="update-status-badge" data-tone="${escapeAttr(tone)}">${escapeHtml(statusText)}</span>
+      </div>
+      <p>${escapeHtml(summary)}</p>
+      ${result.manifestUrl ? `<small>更新源：${escapeHtml(result.manifestUrl)}</small>` : ""}
+    </article>
+    <section class="update-version-grid">
+      <article>
+        <span>当前版本</span>
+        <strong>v${escapeHtml(result.currentVersion || currentAppInfo?.version || "-")}</strong>
+      </article>
+      <article>
+        <span>最新版本</span>
+        <strong>v${escapeHtml(result.latestVersion || result.currentVersion || currentAppInfo?.version || "-")}</strong>
+      </article>
+    </section>
+    ${(notes.length || result.fileName || result.sha256) ? `
+      <section class="update-notes-card">
+        <strong>版本信息</strong>
+        ${result.fileName ? `<small>安装包：${escapeHtml(result.fileName)}</small>` : ""}
+        ${result.sha256 ? `<small>SHA-256：<code>${escapeHtml(result.sha256)}</code></small>` : ""}
+        ${notes.length ? `<ul>${notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
+      </section>
+    ` : ""}
+  `;
+}
+
+async function openChangelogDialog() {
+  const button = document.querySelector("#view-changelog");
+  const previous = button?.textContent || "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "读取中...";
+  }
+  try {
+    if (!changelogEntries.length) {
+      const result = await api("/api/changelog");
+      changelogEntries = result.entries || [];
+    }
+    renderChangelogDialog(changelogEntries);
+    document.querySelector("#changelog-dialog").showModal();
+  } catch (error) {
+    renderChangelogDialog([], error.message);
+    document.querySelector("#changelog-dialog").showModal();
+    pushActivity("error", "读取更新记录失败", error.message);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = previous;
+    }
+  }
+}
+
+function closeChangelogDialog() {
+  document.querySelector("#changelog-dialog").close();
+}
+
+function renderChangelogDialog(entries = [], errorMessage = "") {
+  const container = document.querySelector("#changelog-list");
+  if (!container) return;
+  if (errorMessage) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <strong>读取更新记录失败</strong>
+        <span>${escapeHtml(errorMessage)}</span>
+      </div>
+    `;
+    return;
+  }
+  if (!entries.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <strong>暂无更新记录</strong>
+        <span>当前还没有可展示的版本说明。</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = entries.map((entry) => `
+    <article class="changelog-entry">
+      <div class="changelog-entry-header">
+        <div class="changelog-entry-meta">
+          <strong>${escapeHtml(entry.version || "-")}</strong>
+          <span>${escapeHtml(entry.date || "")}</span>
+        </div>
+        ${releaseDownloadUrl(entry.version) ? `
+          <button class="button ghost changelog-download-button" type="button" data-version="${escapeAttr(entry.version || "")}">
+            下载此版本
+          </button>
+        ` : ""}
+      </div>
+      ${(entry.sections || []).map((section) => `
+        <section class="changelog-section">
+          <h4>${escapeHtml(section.title || "")}</h4>
+          <ul>${(section.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </section>
+      `).join("")}
+    </article>
+  `).join("");
 }
 
 function openImportDialog() {
@@ -2167,10 +2482,12 @@ function clearCreateError() {
 }
 
 function pushActivity(level, message, detail = "", options = {}) {
+  const category = options.category || inferActivityCategory(message, detail, options);
   activityLog = [
     {
       id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       level,
+      category,
       message,
       detail,
       time: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
@@ -2182,6 +2499,17 @@ function pushActivity(level, message, detail = "", options = {}) {
   renderActivityLog();
 }
 
+function inferActivityCategory(message, detail = "", options = {}) {
+  if (options.routeKey) return "browser";
+  const text = `${message} ${detail}`.toLowerCase();
+  if (/更新|版本|release|manifest/.test(text)) return "update";
+  if (/mcp|agent|codex|claude/.test(text)) return "agent";
+  if (/节点|代理|mihomo|订阅|listener/.test(text)) return "proxy";
+  if (/浏览器|cdp|前台|启动|关闭/.test(text)) return "browser";
+  if (/配置|目录池|保存|导入|导出/.test(text)) return "config";
+  return "system";
+}
+
 function getActivityLevelLabel(level) {
   if (level === "success") return "成功";
   if (level === "error") return "错误";
@@ -2191,14 +2519,19 @@ function getActivityLevelLabel(level) {
 
 function renderActivityLog() {
   const container = document.querySelector("#activity-log");
-  const filteredLog = activityLog;
+  const filteredLog = activityCategoryFilter === "all"
+    ? activityLog
+    : activityLog.filter((entry) => entry.category === activityCategoryFilter);
   document.querySelector("#activity-filter-label").textContent = `当前范围：${activityFilterLabel}`;
+  const countBadge = document.querySelector(".activity-count-badge");
+  if (countBadge) countBadge.textContent = `${filteredLog.length} 条`;
+  syncActivityCategoryButtons();
 
   if (!filteredLog.length) {
     container.innerHTML = `
       <div class="empty-state">
         <strong>暂无日志</strong>
-        <span>启动浏览器、保存配置、切换节点后会显示记录。</span>
+        <span>当前分类下还没有记录。</span>
       </div>
     `;
     return;
@@ -2212,13 +2545,34 @@ function renderActivityLog() {
           ${entry.detail ? `<p>${escapeHtml(entry.detail)}</p>` : ""}
         </div>
         <div class="activity-entry-side">
-          <span class="activity-entry-level">${escapeHtml(getActivityLevelLabel(entry.level))}</span>
+          <span class="activity-entry-level">${escapeHtml(getActivityLevelLabel(entry.level))} · ${escapeHtml(getActivityCategoryLabel(entry.category))}</span>
           <time>${escapeHtml(entry.time)}</time>
         </div>
       </div>
     </article>
   `).join("");
   renderDashboardActivityPreview();
+}
+
+function getActivityCategoryLabel(category) {
+  if (category === "browser") return "浏览器";
+  if (category === "proxy") return "代理";
+  if (category === "config") return "配置";
+  if (category === "update") return "更新";
+  if (category === "agent") return "Agent";
+  return "系统";
+}
+
+function setActivityCategoryFilter(category = "all") {
+  activityCategoryFilter = category;
+  activityFilterLabel = category === "all" ? "全部日志" : `${getActivityCategoryLabel(category)}日志`;
+  renderActivityLog();
+}
+
+function syncActivityCategoryButtons() {
+  document.querySelectorAll(".activity-filter-chip").forEach((button) => {
+    button.classList.toggle("active", button.dataset.category === activityCategoryFilter);
+  });
 }
 
 function escapeHtml(value) {
@@ -2285,14 +2639,45 @@ document.querySelector("#choose-proxy-client").addEventListener("click", openPro
 document.querySelector("#close-proxy-client-dialog").addEventListener("click", closeProxyClientDialog);
 document.querySelector("#choose-browser").addEventListener("click", openBrowserDialog);
 document.querySelector("#close-browser-dialog").addEventListener("click", closeBrowserDialog);
-document.querySelector("#copy-mcp-url").addEventListener("click", () => {
-  copyMcpUrl().catch((error) => pushActivity("error", "复制 MCP 地址失败", error.message));
+document.querySelector("#copy-local-url").addEventListener("click", () => {
+  copyInputValue("#settings-local-url", "已复制本地页面地址").catch((error) => pushActivity("error", "复制本地页面地址失败", error.message));
+});
+document.querySelector("#copy-mcp-message").addEventListener("click", () => {
+  copyInputValue("#settings-mcp-message", "已复制 MCP 安装话术").catch((error) => pushActivity("error", "复制 MCP 安装话术失败", error.message));
+});
+document.querySelector("#open-feedback-issues").addEventListener("click", () => {
+  const url = issueFeedbackUrl();
+  if (!url) {
+    pushActivity("error", "未找到反馈地址", "当前版本没有配置 GitHub Issues 地址。");
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
 });
 document.querySelector("#check-updates").addEventListener("click", () => {
   checkUpdates().catch((error) => pushActivity("error", "检查更新失败", error.message));
 });
+document.querySelector("#view-changelog").addEventListener("click", () => {
+  openChangelogDialog().catch((error) => pushActivity("error", "读取更新记录失败", error.message));
+});
 document.querySelector("#download-support-bundle").addEventListener("click", () => {
   downloadSupportBundle().catch((error) => pushActivity("error", "导出排障包失败", error.message));
+});
+document.querySelector("#close-update-dialog").addEventListener("click", closeUpdateDialog);
+document.querySelector("#open-changelog-from-update").addEventListener("click", () => {
+  closeUpdateDialog();
+  openChangelogDialog().catch((error) => pushActivity("error", "读取更新记录失败", error.message));
+});
+document.querySelector("#open-update-download").addEventListener("click", (event) => {
+  const url = event.currentTarget.dataset.url || "";
+  if (!url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
+});
+document.querySelector("#close-changelog-dialog").addEventListener("click", closeChangelogDialog);
+document.querySelector("#changelog-list").addEventListener("click", (event) => {
+  const button = event.target.closest(".changelog-download-button");
+  if (!button) return;
+  const version = button.dataset.version || "";
+  openVersionDownload(version).catch((error) => pushActivity("error", "打开版本下载失败", error.message));
 });
 document.querySelector("#toggle-local-advanced").addEventListener("click", () => {
   const section = document.querySelector("#local-advanced-settings");
@@ -2314,6 +2699,21 @@ document.querySelector("#clear-activity-log").addEventListener("click", () => {
 document.querySelector("#open-guide-dialog").addEventListener("click", openGuideDialog);
 document.querySelector("#open-guide-inline").addEventListener("click", openGuideDialog);
 document.querySelector("#close-guide-dialog").addEventListener("click", closeGuideDialog);
+document.querySelector("#route-filter-node-issues").addEventListener("click", () => {
+  routeStateFilter = "node-issue";
+  document.querySelector("#route-state-filter").value = "node-issue";
+  renderRoutes(currentRoutes);
+});
+document.querySelector("#route-clear-filters").addEventListener("click", () => {
+  routeStateFilter = "all";
+  routeSearchQuery = "";
+  document.querySelector("#route-state-filter").value = "all";
+  document.querySelector("#route-search").value = "";
+  renderRoutes(currentRoutes);
+});
+document.querySelectorAll(".activity-filter-chip").forEach((button) => {
+  button.addEventListener("click", () => setActivityCategoryFilter(button.dataset.category || "all"));
+});
 document.querySelector("#open-proxy-settings").addEventListener("click", () => {
   window.location.hash = "settings";
   window.setTimeout(() => {
@@ -2322,7 +2722,7 @@ document.querySelector("#open-proxy-settings").addEventListener("click", () => {
 });
 document.querySelectorAll("[data-target-page]").forEach((button) => {
   button.addEventListener("click", () => {
-    document.querySelector("#guide-dialog")?.close();
+    closeGuideDialog();
     window.location.hash = button.dataset.targetPage;
     if (button.dataset.targetAction === "proxy-settings") {
       window.setTimeout(() => {

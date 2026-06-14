@@ -1,6 +1,6 @@
 {
   "name": "md-browser",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local browser profile and proxy route manager for team workflows.",
   "author": "MD-Browser contributors",
   "license": "MIT",
@@ -26,7 +26,8 @@
     "prepackage:mac:signed": "npm run clean:dist && node scripts/preflight_signed_mac.cjs",
     "package:mac:signed": "electron-builder --config electron-builder.signed.yml --mac dmg zip --arm64",
     "verify:mac:signed": "node scripts/verify_signed_mac.cjs",
-    "release:manifest": "node scripts/release_manifest.cjs"
+    "release:manifest": "node scripts/release_manifest.cjs",
+    "release:prepare": "node scripts/prepare_release.cjs"
   },
   "engines": {
     "node": ">=20"
@@ -42,6 +43,7 @@
     "appId": "com.local.md-browser",
     "productName": "MD-Browser",
     "asar": true,
+    "afterPack": "scripts/postprocess_unsigned_mac.cjs",
     "directories": {
       "output": "dist"
     },
@@ -61,7 +63,8 @@
         "zip"
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "identity": null
+      "identity": null,
+      "hardenedRuntime": false
     },
     "dmg": {
       "artifactName": "${productName}-${version}-${arch}.${ext}"
