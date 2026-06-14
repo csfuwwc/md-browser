@@ -1,182 +1,104 @@
 # MD-Browser
 
-MD-Browser 是一个本地浏览器配置与代理路由管理器。团队成员通过本地 WebUI 管理配置名称、CDP 端口、代理入口、`user-data-dir`、Chrome `profile-directory` 和 Mihomo 节点；Agent 只需要读取配置并连接对应 CDP 端口。
+MD-Browser is a local browser configuration and proxy route manager. It provides a WebUI, a macOS desktop shell, a local HTTP API, and an MCP entrypoint for managing isolated Chromium profiles, CDP ports, proxy listener ports, and node bindings without touching the system default browser profile.
 
-## 快速开始
+## What It Does
 
-### 构建和发布
+- Create named browser configurations with dedicated `user-data-dir`, Chrome profile, CDP port, proxy listener port, and optional start URL.
+- Start or reconnect to the matching Chromium instance through the configured CDP endpoint.
+- Bind each browser configuration to a concrete proxy node through an external Mihomo-compatible client or an embedded Mihomo core.
+- Expose the same local configuration to agents through HTTP and MCP so automation can launch or connect to the correct browser instance.
+- Protect the system default Chrome profile and refuse to take over unrelated browser processes.
 
-```bash
-npm test
-npm run package:mac
-MD_BROWSER_RELEASE_MANIFEST_COPY=~/Downloads/MD-Browser-latest-mac-arm64.json npm run release:manifest
-```
+## Architecture
 
-`release:manifest` 会读取当前版本的 `dist/MD-Browser-<version>-arm64.dmg`，生成 `dist/latest-mac-arm64.json`。这份 JSON 用于客户端检查是否有新版，也方便负责人核对下载包的 SHA-256。
+MD-Browser separates responsibilities into four layers:
 
-### 使用 Mac 客户端内测包
+- Browser configuration management: route records, profile directories, CDP ports, start URLs, and ownership checks.
+- Proxy routing: listener port allocation and node binding through external or embedded Mihomo.
+- Local control plane: WebUI and REST endpoints on `http://127.0.0.1:18777`.
+- Agent integration: MCP stdio and HTTP APIs for configuration lookup, launch, URL open, and node delay checks.
 
-当前内测安装包已经生成到：
-
-```text
-~/Downloads/MD-Browser-0.3.0-arm64.dmg
-```
-
-SHA-256：
-
-```text
-152f4cad4402fd9b4ce3ccd274d04a685526d90e0639bf0ee3f25ed1d034946f
-```
-
-打开 `.dmg` 后把 `MD-Browser.app` 拖到 `/Applications`。当前包未签名、未公证，如果 macOS 提示无法打开，内测阶段可以用下面两种方式之一处理：
-
-- 在访达里右键 `MD-Browser.app`，选择“打开”，再确认打开。
-- 如果仍被拦截，在终端执行：
-
-```bash
-xattr -dr com.apple.quarantine /Applications/MD-Browser.app
-open /Applications/MD-Browser.app
-```
-
-正式分发包会走 Apple Developer 签名和公证，届时不需要这一步。
-
-给团队成员分发时，可以直接附上 [团队内测安装与首次配置指南](docs/team-install-guide.md)。
-
-版本规划和更新记录：
-
-- [Roadmap](ROADMAP.md)
-- [Changelog](CHANGELOG.md)
-
-### 使用本地 WebUI 调试
-
-```bash
-cd tk-browser-node-routing
-chmod +x scripts/*.sh
-scripts/start_webui.sh
-```
-
-停止页面服务：
-
-```bash
-scripts/stop_webui.sh
-```
-
-打开：
-
-```text
-http://127.0.0.1:18777
-```
-
-WebUI 会显示并维护一组“浏览器环境配置”，每条配置至少包含：
-
-| 配置名称 | Agent/CDP 端口 | 浏览器代理入口 | User Data Dir | Chrome Profile |
-|---|---:|---:|---|---|
-| Market US | 9222 | 18101 | `.../Market-US` | `Default` |
-| Market Brazil | 9223 | 18102 | `.../Market-BR` | `Profile 1` |
-| Content Workspace | 9333 | 18333 | `.../Content` | `Default` |
-
-注意：CDP 端口和代理入口端口在 WebUI 内会做防重校验。
-
-## WebUI 能做什么
-
-- 查看每条浏览器配置是否已启动
-- 查看每个代理入口是否已监听
-- 启动指定配置对应的浏览器
-- 把 Chrome 窗口拉到前台
-- 新增、编辑、删除浏览器配置
-- 编辑 CDP 端口、代理入口、`user-data-dir`、Chrome `profile-directory` 和节点绑定
-- 维护多个 `user-data-dir` 目录池，不绑定固定目录命名
-- 选择外部代理客户端或内置 Mihomo
-- 检测当前代理后端是否可用，并展示可绑定节点池
-
-配置保存在每个人本机：
+Local state is stored in:
 
 ```text
 ~/.md-browser/config.json
 ```
 
-旧版本的 `~/.tk-browser-router/config.json` 会在首次启动时自动迁移到新路径，并在旧目录生成一份 `config.legacy-backup.<时间>.json` 备份；旧文件本身也会保留。
-
-浏览器资料目录也保存在每个人本机：
+Managed browser identities and embedded proxy assets are stored under:
 
 ```text
-~/Library/Application Support/Google/
+~/Library/Application Support/MD-Browser/
 ```
 
-团队共享工具包时，不会共享账号登录态。
+Legacy `~/.tk-browser-router/config.json` data is migrated automatically on first run and backed up in place.
 
-设置页的“诊断信息”卡片会显示配置文件、脚本日志、内置 Mihomo Core 和内置配置路径，方便团队成员遇到问题时直接把关键信息发给负责人。
+## Quick Start
 
-`v0.3.0` 起，诊断信息卡片还提供：
+### Run the WebUI
 
-- 检查更新：读取 release manifest，判断当前客户端是否有新版。
-- 导出排障包：导出脱敏后的配置摘要、浏览器配置状态和最近日志，不包含账号登录态、Cookie、订阅明文或密钥。
+```bash
+git clone https://github.com/csfuwwc/md-browser.git
+cd md-browser
+npm install
+npm start
+```
 
-## 代理服务模式
-
-WebUI 负责 Chrome、资料目录、CDP 端口、代理入口端口和状态显示；代理服务负责真正的网络节点。当前支持两种模式：
-
-### 外部代理客户端
-
-这是默认模式，适合已经在用 Clash Verge Rev 的同事。
-
-设置页选择“外部代理客户端”，点击“选择客户端”后，MD-Browser 会检测本机 Clash Verge Rev，并读取：
-
-- Mihomo `external-controller`
-- Merge / 覆写配置路径
-- 运行配置路径
-
-首次配置时，如果本机还没有 listener，可以打开 `config/mihomo-listeners.example.yaml`，把里面的监听入口改成你本机真实使用的代理入口和节点名，然后复制到 Clash Verge 的 Merge / 覆写配置里。
-
-保存后执行：
+Open:
 
 ```text
-保存覆写配置
-重新启用当前订阅
-重启 Clash / Mihomo 内核
+http://127.0.0.1:18777
 ```
 
-后续只要 Mihomo API 可用，WebUI 可以直接把某条浏览器配置绑定到具体节点，不需要频繁手动改 Clash Verge YAML。
+### Run Tests
 
-### 内置 Mihomo
-
-内置模式适合后续把 MD-Browser 做成完整本地客户端时使用。
-
-设置页选择“内置 Mihomo”后，流程是：
-
-1. 填写代理订阅地址。
-2. 点击“安装并启用”。
-
-MD-Browser 会自动先保存当前设置，再从 MetaCubeX/mihomo 最新 release 下载适合当前 macOS 架构的 `.gz` 二进制，解压到：
-
-```text
-~/Library/Application Support/MD-Browser/bin/mihomo
+```bash
+npm test
 ```
 
-随后生成内置 Mihomo 配置：
+### Run the MCP Server
 
-```text
-~/Library/Application Support/MD-Browser/mihomo/config.yaml
+```bash
+npm run mcp
 ```
 
-最后按这份配置启动内置 Mihomo。
+## Build the macOS App
 
-内置模式不会修改 Clash Verge 配置；切回外部模式后，仍然使用本机外部代理客户端。
+Unsigned local package:
 
-### 节点页的定位
+```bash
+npm run package:mac
+```
 
-左侧“节点池”页面只展示当前代理后端返回的可绑定节点：
+Signed package flow:
 
-- 外部模式：读取外部 Clash Verge / Mihomo API
-- 内置模式：读取内置 Mihomo API
+```bash
+npm run package:mac:signed
+npm run verify:mac:signed
+```
 
-订阅地址、一键安装启用、启动和停止都在“设置”页面完成，节点页不承担代理服务管理。
+Release manifest generation:
 
-## Agent 如何连接
+```bash
+MD_BROWSER_RELEASE_MANIFEST_COPY=~/Downloads/MD-Browser-latest-mac-arm64.json npm run release:manifest
+```
 
-推荐让 Codex / Agent 通过 MD-Browser 的 Agent 通道读取配置，而不是自己猜端口。
+More packaging and upgrade notes live in [docs/client-release-and-upgrade.md](docs/client-release-and-upgrade.md).
 
-本地 API：
+## Proxy Backends
+
+MD-Browser supports two proxy routing modes:
+
+- External Mihomo-compatible client:
+  Reads node data and writes listener bindings through a local controller API and merge/runtime config files.
+- Embedded Mihomo:
+  Downloads, configures, and starts a local Mihomo core under the MD-Browser application support directory.
+
+The node pool page only displays nodes returned by the active backend. Backend setup and switching happen in settings.
+
+## Agent Integration
+
+Local HTTP API:
 
 ```text
 GET  http://127.0.0.1:18777/api/agent/routes
@@ -185,13 +107,7 @@ POST http://127.0.0.1:18777/api/agent/routes/{routeKey}/open-url
 POST http://127.0.0.1:18777/api/agent/routes/{routeKey}/node-delay
 ```
 
-MCP stdio 服务：
-
-```bash
-npm run mcp
-```
-
-当前 MCP 工具包括：
+MCP tools currently include:
 
 - `list_browser_configs`
 - `get_browser_config`
@@ -199,63 +115,30 @@ npm run mcp
 - `open_url_in_config`
 - `test_config_node_delay`
 
-本机 Codex 个人插件入口是 `MD-Browser`。它读取同一个本地服务，不另外保存浏览器登录态或节点配置。
-
-Agent 读取到配置后，仍然通过 CDP 端口连接浏览器。Playwright / Puppeteer 的底层连接方式如下：
+Example Playwright connection:
 
 ```js
 const { chromium } = require("playwright");
 
-const marketUs = await chromium.connectOverCDP("http://127.0.0.1:9222");
-const contentWorkspace = await chromium.connectOverCDP("http://127.0.0.1:9333");
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
 ```
 
-## 本地 API 排障
+## Security Model
 
-不打开页面时，可以直接通过本地 Agent API 查看配置：
+- MD-Browser does not export browser login state, cookies, or raw local profile contents through team sharing or support bundles.
+- Support bundles are sanitized before export.
+- Route startup refuses to use the system default Chrome profile.
+- Route actions refuse to operate on a CDP port that belongs to another browser identity.
 
-```bash
-curl http://127.0.0.1:18777/api/agent/routes
-```
+## Docs
 
-启动某个浏览器配置：
+- [Changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Team install guide](docs/team-install-guide.md)
+- [Client release and upgrade notes](docs/client-release-and-upgrade.md)
 
-```bash
-curl -X POST http://127.0.0.1:18777/api/agent/routes/<routeKey>/launch
-```
+## License
 
-在指定配置里打开网站：
-
-```bash
-curl -X POST http://127.0.0.1:18777/api/agent/routes/<routeKey>/open-url \
-  -H 'content-type: application/json' \
-  -d '{"url":"https://example.com/"}'
-```
-
-这里的 `<routeKey>` 不再固定为某个国家，必须以 MD-Browser 里实际创建的浏览器配置为准。
-
-## 常见问题
-
-### 浏览器配置显示“不可用 / 代理离线”
-
-说明 Chrome 已经启动，但对应的 Clash/Mihomo 代理入口还没有监听。需要检查对应 listener 是否已配置并重启内核。
-
-### 浏览器里还是显示 7897
-
-不要看 macOS 系统代理页面。打开该浏览器里的：
-
-```text
-chrome://version
-```
-
-看 `Command Line` 是否包含：
-
-```text
---proxy-server=http://127.0.0.1:18101
-```
-
-如果不是，通常是旧 Chrome 进程或旧资料目录被复用了。用 WebUI 重新启动对应配置。
-
-### 每个人节点名称不同
-
-这是正常的。团队共享这个目录时，保留 WebUI 和脚本不变；每个人只改自己本机 Clash Verge / Mihomo 里的节点配置即可。
+Released under the [MIT License](LICENSE).

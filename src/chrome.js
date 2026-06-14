@@ -103,8 +103,11 @@ function userDataRootLabel(path) {
   const mdIndex = parts.lastIndexOf("MD-Browser");
   if (mdIndex >= 0) return parts.slice(mdIndex).join("/");
   const tkIndex = parts.lastIndexOf("TK Browser Router");
-  if (tkIndex >= 0) return parts.slice(tkIndex).join("/");
-  return basename(path);
+  if (tkIndex >= 0) return "Legacy Managed Profiles";
+  const base = basename(path);
+  if (base === "TKCountryProfiles") return "Imported Chrome Profiles";
+  if (base === "SocialScraperProfiles") return "Imported Workspace Profiles";
+  return base;
 }
 
 export function listImportableUserDataRootCandidates(configuredRoots = [], homeDir = homedir()) {
@@ -112,22 +115,22 @@ export function listImportableUserDataRootCandidates(configuredRoots = [], homeD
   const candidates = [
     {
       path: "~/Library/Application Support/Google/TKCountryProfiles",
-      label: "TKCountryProfiles 目录池",
+      label: "Imported Chrome Profiles (legacy)",
       kind: "pool"
     },
     {
       path: "~/Library/Application Support/Google/SocialScraperProfiles",
-      label: "SocialScraperProfiles 目录池",
+      label: "Imported Workspace Profiles (legacy)",
       kind: "pool"
     },
     {
       path: "~/Library/Application Support/MD-Browser/Profiles",
-      label: "MD-Browser 独立身份",
+      label: "MD-Browser Managed Profiles",
       kind: "managed"
     },
     {
       path: "~/Library/Application Support/TK Browser Router/Profiles",
-      label: "TK Browser Router 旧独立身份",
+      label: "Legacy Managed Profiles",
       kind: "legacy-managed"
     }
   ];

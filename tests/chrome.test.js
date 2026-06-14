@@ -30,20 +30,20 @@ import {
 
 test("expandHome replaces leading tilde", () => {
   assert.equal(
-    expandHome("~/Library/Application Support/Google/TKCountryProfiles", "/Users/example"),
-    "/Users/example/Library/Application Support/Google/TKCountryProfiles"
+    expandHome("~/Library/Application Support/MD-Browser/Profiles", "/Users/example"),
+    "/Users/example/Library/Application Support/MD-Browser/Profiles"
   );
 });
 
 test("buildChromeArgs includes CDP port profile and proxy", () => {
   const args = buildChromeArgs({
     cdpPort: 9222,
-    profileDir: "/Users/example/TK-US",
+    profileDir: "/Users/example/Profile-A",
     profileDirectory: "Profile 1",
     proxyUrl: "http://127.0.0.1:18101"
   });
   assert.ok(args.includes("--remote-debugging-port=9222"));
-  assert.ok(args.includes("--user-data-dir=/Users/example/TK-US"));
+  assert.ok(args.includes("--user-data-dir=/Users/example/Profile-A"));
   assert.ok(args.includes("--profile-directory=Profile 1"));
   assert.ok(args.includes("--proxy-server=http://127.0.0.1:18101"));
   assert.ok(args.includes("--new-window"));
@@ -52,7 +52,7 @@ test("buildChromeArgs includes CDP port profile and proxy", () => {
 test("buildChromeArgs opens Google when start URL is empty", () => {
   const args = buildChromeArgs({
     cdpPort: 9222,
-    profileDir: "/Users/example/TK-US",
+    profileDir: "/Users/example/Profile-A",
     proxyUrl: "http://127.0.0.1:18101",
     startUrl: ""
   });
@@ -63,7 +63,7 @@ test("buildChromeArgs opens Google when start URL is empty", () => {
 test("buildChromeArgs can open identity page before target site", () => {
   const args = buildChromeArgs({
     cdpPort: 9222,
-    profileDir: "/Users/example/TK-US",
+    profileDir: "/Users/example/Profile-A",
     proxyUrl: "http://127.0.0.1:18101",
     identityUrl: "http://127.0.0.1:18777/identity.html?route=tk-us",
     startUrl: "https://example.com/profile"
@@ -407,25 +407,25 @@ test("listUserDataDirsForRoots labels managed MD-Browser profiles clearly", () =
   }
 });
 
-test("listUserDataDirsForRoots keeps legacy TK Browser Router labels readable", () => {
+test("listUserDataDirsForRoots presents a neutral label for legacy managed profiles", () => {
   const home = mkdtempSync(join(tmpdir(), "tk-legacy-managed-label-"));
   const managedRoot = join(home, "Library/Application Support/TK Browser Router/Profiles");
   try {
     mkdirSync(join(managedRoot, "TK-US", "Default"), { recursive: true });
     const entries = listUserDataDirsForRoots([managedRoot]);
-    assert.equal(entries[0].rootLabel, "TK Browser Router/Profiles");
-    assert.equal(entries[0].label, "TK Browser Router/Profiles/TK-US");
+    assert.equal(entries[0].rootLabel, "Legacy Managed Profiles");
+    assert.equal(entries[0].label, "Legacy Managed Profiles/TK-US");
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
 });
 
 test("userDataDir supports explicit directory while preserving legacy profileName fallback", () => {
-  const config = { profileRoot: "/Users/example/TKCountryProfiles" };
+  const config = { profileRoot: "/Users/example/LegacyProfiles" };
 
   assert.equal(
     userDataDir(config, { profileName: "TK-US" }),
-    "/Users/example/TKCountryProfiles/TK-US"
+    "/Users/example/LegacyProfiles/TK-US"
   );
   assert.equal(
     userDataDir(config, { profileName: "OLD", userDataDir: "/Users/example/Custom/TK-BR" }),
@@ -459,12 +459,12 @@ test("listImportableUserDataRootCandidates returns existing known roots with alr
       })),
       [
         {
-          path: "~/Library/Application Support/MD-Browser/Profiles",
-          alreadyAdded: false
-        },
-        {
           path: "~/Library/Application Support/Google/TKCountryProfiles",
           alreadyAdded: true
+        },
+        {
+          path: "~/Library/Application Support/MD-Browser/Profiles",
+          alreadyAdded: false
         }
       ]
     );

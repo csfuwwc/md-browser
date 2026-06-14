@@ -69,8 +69,6 @@ test("loadConfig migrates legacy tk-browser-router config to MD-Browser path", (
 test("user-data roots can be added and removed", () => {
   const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
   try {
-    removeUserDataRoot("~/Library/Application Support/Google/TKCountryProfiles", { homeDir: dir });
-    removeUserDataRoot("~/Library/Application Support/Google/SocialScraperProfiles", { homeDir: dir });
     let config = loadConfig({ homeDir: dir });
     assert.deepEqual(config.userDataRoots, []);
 

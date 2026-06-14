@@ -3,7 +3,16 @@
   "version": "0.3.0",
   "description": "Local browser profile and proxy route manager for team workflows.",
   "author": "MD-Browser contributors",
+  "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/csfuwwc/md-browser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/csfuwwc/md-browser/issues"
+  },
+  "homepage": "https://github.com/csfuwwc/md-browser#readme",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
