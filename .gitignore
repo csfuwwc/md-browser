@@ -3,6 +3,7 @@ dist/
 dist-signed/
 dist-tauri/
 .tauri-bundle/
+tauri-bundle/
 src-tauri/target/
 coverage/
 

@@ -285,6 +285,36 @@ test("createRoute assigns a managed user data dir when none is selected", () => 
   }
 });
 
+test("createRoute uses the configured profileRoot for managed identities", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
+  try {
+    saveConfig({
+      version: 1,
+      server: { host: "127.0.0.1", port: 18777 },
+      profileRoot: "~/CustomProfiles",
+      userDataRoots: [],
+      chromeAppName: "Google Chrome",
+      proxyClient: { mode: "external" },
+      agent: { mcpEnabled: true },
+      mihomo: {},
+      embeddedMihomo: {},
+      routes: {}
+    }, { homeDir: dir });
+
+    const created = createRoute({
+      label: "Custom Root Route",
+      cdpPort: 9556,
+      proxyUrl: "http://127.0.0.1:18556"
+    }, { homeDir: dir });
+
+    const route = created.config.routes[created.routeKey];
+    assert.equal(route.userDataDir, "~/CustomProfiles/Custom Root Route");
+    assert.equal(existsSync(join(dir, "CustomProfiles/Custom Root Route/Default")), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("updateRoute replaces an existing user data dir with a managed identity when requested", () => {
   const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
   try {
@@ -326,6 +356,44 @@ test("updateRoute replaces an existing user data dir with a managed identity whe
       existsSync(join(dir, "Library/Application Support/MD-Browser/Profiles/test/Default")),
       true
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("updateRoute uses the configured profileRoot when switching back to a managed identity", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
+  try {
+    saveConfig({
+      version: 1,
+      server: { host: "127.0.0.1", port: 18777 },
+      profileRoot: "~/CustomProfiles",
+      userDataRoots: [],
+      chromeAppName: "Google Chrome",
+      proxyClient: { mode: "external" },
+      agent: { mcpEnabled: true },
+      mihomo: {},
+      embeddedMihomo: {},
+      routes: {
+        test: {
+          label: "Custom Root Route",
+          cdpPort: 9556,
+          proxyUrl: "http://127.0.0.1:18556",
+          profileName: "Legacy",
+          userDataDir: "/Users/example/BrowserProfiles/Legacy",
+          profileDirectory: "Default"
+        }
+      }
+    }, { homeDir: dir });
+
+    const config = updateRoute("test", {
+      userDataDir: "",
+      profileName: "Custom Root Route",
+      profileDirectory: "Default"
+    }, { homeDir: dir });
+
+    assert.equal(config.routes.test.userDataDir, "~/CustomProfiles/Custom Root Route");
+    assert.equal(existsSync(join(dir, "CustomProfiles/Custom Root Route/Default")), true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

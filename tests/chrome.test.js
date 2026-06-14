@@ -176,7 +176,7 @@ test("route port ownership requires the matching user data dir", () => {
       processes: [{
         fullCommand: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9222 --user-data-dir=/Users/example/Library/Application Support/MD-Browser/Profiles/Test"
       }]
-    }, 9222, "/Users/example/Library/Application Support/MD-Browser/Profiles/Test"),
+    }, 9222, "/Users/example/Library/Application Support/MD-Browser/Profiles/Test", "test"),
     true
   );
   assert.equal(
@@ -184,15 +184,26 @@ test("route port ownership requires the matching user data dir", () => {
       processes: [{
         fullCommand: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9222 --user-data-dir=/Users/example/Library/Application Support/Google/Chrome"
       }]
-    }, 9222, "/Users/example/Library/Application Support/MD-Browser/Profiles/Test"),
+    }, 9222, "/Users/example/Library/Application Support/MD-Browser/Profiles/Test", "test"),
     false
+  );
+});
+
+test("route port ownership accepts the identity route marker when the user-data-dir path is unreadable", () => {
+  assert.equal(
+    isRoutePortOwnedByUserDataDir({
+      processes: [{
+        fullCommand: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9222 --user-data-dir=/Users/example/Library/Application Support/MD-Browser/Profiles/M-gM^[M-4M-hM-?M^^ http://127.0.0.1:18777/identity.html?route=env https://www.google.com/"
+      }]
+    }, 9222, "/Users/example/Library/Application Support/MD-Browser/Profiles/直连", "env"),
+    true
   );
 });
 
 test("assertRoutePortOwner reports owner mismatch instead of operating on another browser", async () => {
   await assert.rejects(
     assertRoutePortOwner(
-      { cdpPort: 9222 },
+      { cdpPort: 9222, key: "test" },
       "/Users/example/Library/Application Support/MD-Browser/Profiles/Test",
       async () => ({
         port: 9222,

@@ -14,11 +14,11 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 ## 当前内测构建
 
-- 版本：`1.0.0`
+- 版本：`1.0.1`
 - 架构：Apple Silicon / arm64，适用于 M 系列 Mac
-- 本地安装包：`~/Downloads/MD-Browser_1.0.0_aarch64.dmg`
-- SHA-256：`5fe07511fb1145490bccf66122c336379ca0bffc876b8cb49585de7ee94c9df8`
-- 构建时间：`2026-06-14 15:16 CST`
+- 本地安装包：`~/Downloads/MD-Browser_1.0.1_aarch64.dmg`
+- SHA-256：`57bc9e0946486bc9b60fc174a95194d39759d8d1917f0edcab62d8406e801f63`
+- 构建时间：`2026-06-14 22:51 CST`
 - 签名状态：未签名、未公证，仅适合本机或内部临时验证
 - 已验证：测试通过；打包后需验证 DMG 校验和本地 `/api/status` 版本。
 - 正式签名前置检查：`2026-06-12 15:00 CST` 已执行，当前缺少 `Developer ID Application` 证书和 Apple 公证凭据
@@ -33,7 +33,7 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 安装步骤：
 
-1. 打开 `~/Downloads/MD-Browser_1.0.0_aarch64.dmg`。
+1. 打开 `~/Downloads/MD-Browser_1.0.1_aarch64.dmg`。
 2. 把 `MD-Browser.app` 拖到 `/Applications`。
 3. 如果 macOS 提示无法打开，先用访达右键 `MD-Browser.app` 选择“打开”。
 4. 如果仍被 Gatekeeper 拦截，内测阶段可以执行：
@@ -163,7 +163,7 @@ Tauri `latest.json` 示例：
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "notes": "优化节点绑定\n修复启动日志",
   "pub_date": "2026-06-14T09:30:00.000Z",
   "platforms": {
@@ -177,7 +177,7 @@ Tauri `latest.json` 示例：
 
 如果远端版本高于本地版本，客户端会在“设置”的版本信息卡片里提示“发现新版本”。这个阶段不在客户端内自动替换 App，风险低。
 
-`v1.0.0` 已实现这个阶段的基础接口和按钮：
+`v1.0.1` 已实现这个阶段的基础接口和按钮：
 
 - `GET /api/update-check`：读取 release manifest，判断是否有新版。
 - “检查更新”按钮：在页面运行日志里显示结果。
@@ -185,7 +185,7 @@ Tauri `latest.json` 示例：
 
 ## 排障包策略
 
-`v1.0.0` 起，设置页支持导出排障包。排障包用于团队成员遇到问题时发给负责人定位，不需要用户打开本机配置文件。
+`v1.0.1` 起，设置页支持导出排障包。排障包用于团队成员遇到问题时发给负责人定位，不需要用户打开本机配置文件。
 
 排障包包含：
 

@@ -1,5 +1,7 @@
 # MD-Browser
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 MD-Browser is a local browser configuration and proxy route manager. It provides a WebUI, a macOS desktop shell, a local HTTP API, and an MCP entrypoint for managing isolated Chromium profiles, CDP ports, proxy listener ports, and node bindings without touching the system default browser profile.
 
 ## What It Does
@@ -77,7 +79,9 @@ src-tauri/target/release/bundle/macos/MD-Browser.app
 src-tauri/target/release/bundle/dmg/MD-Browser_<version>_aarch64.dmg
 ```
 
-If macOS blocks an unsigned internal build during testing, remove the quarantine flag and reopen the app:
+Install by dragging `MD-Browser.app` into `/Applications`.
+
+If macOS shows a message such as `"MD-Browser" is damaged and can't be opened. You should move it to the Trash.` on first launch of an unsigned internal build, remove the quarantine flag and reopen the app:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/MD-Browser.app

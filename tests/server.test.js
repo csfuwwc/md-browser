@@ -328,11 +328,51 @@ test("defaultUpdateManifestUrl derives GitHub latest download manifest", () => {
     }));
     assert.equal(
       defaultUpdateManifestUrl({ packagePath }),
-      "https://github.com/csfuwwc/md-browser/releases/latest/download/latest.json"
+      "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json"
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("checkForUpdate falls back to legacy DMG manifest when latest.json is missing", async () => {
+  const seenUrls = [];
+  const result = await checkForUpdate({
+    currentVersion: "1.0.0",
+    manifestUrl: "https://github.com/csfuwwc/md-browser/releases/latest/download/latest.json",
+    fetchImpl: async (url) => {
+      seenUrls.push(url);
+      if (url.endsWith("/latest.json")) {
+        return {
+          ok: false,
+          status: 404
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            version: "1.0.1",
+            fileName: "MD-Browser_1.0.1_aarch64.dmg",
+            downloadUrl: "MD-Browser_1.0.1_aarch64.dmg",
+            sha256: "abc"
+          };
+        }
+      };
+    }
+  });
+
+  assert.deepEqual(seenUrls, [
+    "https://github.com/csfuwwc/md-browser/releases/latest/download/latest.json",
+    "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json"
+  ]);
+  assert.equal(result.updateAvailable, true);
+  assert.equal(result.latestVersion, "1.0.1");
+  assert.equal(
+    result.manifestUrl,
+    "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json"
+  );
 });
 
 test("parseChangelogMarkdown extracts versions sections and list items", () => {

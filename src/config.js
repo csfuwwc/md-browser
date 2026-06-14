@@ -108,7 +108,7 @@ export function updateRoute(routeKey, patch, options = {}) {
   }
   const nextRoute = { ...config.routes[routeKey], ...cleanPatch };
   if (cleanPatch.userDataDir === "") {
-    applyManagedUserDataDir(nextRoute, options);
+    applyManagedUserDataDir(nextRoute, { ...options, profileRoot: config.profileRoot });
   }
   validateRouteUniqueness(config.routes, routeKey, nextRoute);
   config.routes[routeKey] = nextRoute;
@@ -119,7 +119,7 @@ export function createRoute(input, options = {}) {
   const config = loadConfig(options);
   const route = normalizeRouteInput(input);
   if (!route.userDataDir) {
-    applyManagedUserDataDir(route, options);
+    applyManagedUserDataDir(route, { ...options, profileRoot: config.profileRoot });
   }
   validateRouteUniqueness(config.routes, null, route);
   const key = makeRouteKey(route.label, config.routes);
@@ -132,8 +132,9 @@ export function createRoute(input, options = {}) {
 
 function applyManagedUserDataDir(route, options = {}) {
   const profileName = safePathSegment(route.profileName || route.label);
+  const configuredProfileRoot = String(options.profileRoot || defaultConfig.profileRoot || "").trim() || defaultConfig.profileRoot;
   route.profileName = profileName;
-  route.userDataDir = `${defaultConfig.profileRoot}/${profileName}`;
+  route.userDataDir = `${configuredProfileRoot}/${profileName}`;
   route.profileDirectory = route.profileDirectory || "Default";
   mkdirSync(expandHomePath(join(route.userDataDir, route.profileDirectory), options.homeDir), { recursive: true });
   return route;

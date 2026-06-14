@@ -234,7 +234,7 @@ export async function launchRoute(routeKey, config, {
       error.processes = info.processes || [];
       throw error;
     }
-    await assertRoutePortOwner(route, dir, inspectTcpPortImpl);
+    await assertRoutePortOwner({ ...route, key: routeKey }, dir, inspectTcpPortImpl);
     return { alreadyRunning: true, cdpPort: route.cdpPort };
   }
 
@@ -350,7 +350,7 @@ export async function foregroundRouteWindow(routeKey, config, { fetchImpl = fetc
   if (!(await isTcpListening(route.cdpPort))) {
     throw new Error("这条浏览器配置还没有启动，无法显示对应窗口。");
   }
-  await assertRoutePortOwner(route, userDataDir(config, route));
+  await assertRoutePortOwner({ ...route, key: routeKey }, userDataDir(config, route));
 
   const targets = await fetchRoutePageTargets(route.cdpPort, fetchImpl);
   const target = targets[0];
@@ -366,7 +366,7 @@ export async function foregroundRouteWindow(routeKey, config, { fetchImpl = fetc
 export async function closeRouteBrowser(routeKey, config, options = {}) {
   const route = config.routes[routeKey];
   if (!route) throw new Error(`Unknown route: ${routeKey}`);
-  await assertRoutePortOwner(route, userDataDir(config, route), options.inspectTcpPortImpl || inspectTcpPort);
+  await assertRoutePortOwner({ ...route, key: routeKey }, userDataDir(config, route), options.inspectTcpPortImpl || inspectTcpPort);
   return closeCdpBrowser(route.cdpPort, options);
 }
 
@@ -422,7 +422,7 @@ return ""
 
 export async function assertRoutePortOwner(route, expectedUserDataDir, inspectTcpPortImpl = inspectTcpPort) {
   const info = await inspectTcpPortImpl(route.cdpPort);
-  if (isRoutePortOwnedByUserDataDir(info, route.cdpPort, expectedUserDataDir)) return true;
+  if (isRoutePortOwnedByUserDataDir(info, route.cdpPort, expectedUserDataDir, route.key)) return true;
   const processLabel = info.processes?.length
     ? `当前占用：${info.processes.map((item) => `${item.command || "未知进程"}(${item.pid})`).join("、")}`
     : "当前未识别到占用进程";
@@ -434,12 +434,16 @@ export async function assertRoutePortOwner(route, expectedUserDataDir, inspectTc
   throw error;
 }
 
-export function isRoutePortOwnedByUserDataDir(info, cdpPort, expectedUserDataDir) {
+export function isRoutePortOwnedByUserDataDir(info, cdpPort, expectedUserDataDir, routeKey = "") {
   const expected = normalizeProcessPath(expectedUserDataDir);
+  const routeMarker = routeKey ? `identity.html?route=${encodeURIComponent(routeKey)}` : "";
   return (info.processes || []).some((processInfo) => {
     const command = String(processInfo.fullCommand || processInfo.command || "");
-    return command.includes(`--remote-debugging-port=${cdpPort}`)
-      && normalizeProcessPath(command).includes(`--user-data-dir=${expected}`);
+    if (!command.includes(`--remote-debugging-port=${cdpPort}`)) return false;
+    const normalizedCommand = normalizeProcessPath(command);
+    if (normalizedCommand.includes(`--user-data-dir=${expected}`)) return true;
+    if (routeMarker && normalizedCommand.includes(routeMarker)) return true;
+    return false;
   });
 }
 

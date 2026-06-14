@@ -58,6 +58,52 @@ function apiUrl(path) {
   return new URL(path, `${serviceBaseUrl()}/`).toString();
 }
 
+async function openExternalUrl(url) {
+  const target = String(url || "").trim();
+  if (!target) return false;
+  try {
+    await api("/api/open-external", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: target })
+    });
+    return true;
+  } catch {}
+  try {
+    const opened = window.open(target, "_blank", "noopener,noreferrer");
+    if (opened) return true;
+  } catch {}
+  try {
+    window.location.href = target;
+    return true;
+  } catch {}
+  return false;
+}
+
+function openDialogCompat(selector) {
+  const dialog = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!dialog) return;
+  if (typeof dialog.showModal === "function") {
+    try {
+      dialog.showModal();
+      return;
+    } catch {}
+  }
+  dialog.setAttribute("open", "open");
+}
+
+function closeDialogCompat(selector) {
+  const dialog = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!dialog) return;
+  if (typeof dialog.close === "function") {
+    try {
+      dialog.close();
+      return;
+    } catch {}
+  }
+  dialog.removeAttribute("open");
+}
+
 async function api(path, options) {
   let response;
   try {
@@ -357,6 +403,20 @@ function renderSettingsBasics(app = currentAppInfo) {
   }
   const mcpMessage = document.querySelector("#settings-mcp-message");
   if (mcpMessage) mcpMessage.value = `请安装这个 MCP：${serviceBaseUrl()}/mcp`;
+}
+
+function renderVersionStatus(result = latestUpdateResult, app = currentAppInfo) {
+  const versionNode = document.querySelector("#settings-version-value");
+  const versionDetailNode = document.querySelector("#settings-version-detail");
+  if (versionNode) versionNode.textContent = "MD-Browser";
+  if (!versionDetailNode) return;
+
+  const currentVersion = normalizeVersionLabel(result?.currentVersion || app?.version || "");
+  if (result?.updateAvailable && result?.latestVersion) {
+    versionDetailNode.textContent = `${currentVersion || "当前版本未知"} -> ${normalizeVersionLabel(result.latestVersion)}`;
+    return;
+  }
+  versionDetailNode.textContent = currentVersion || "未读取到版本号";
 }
 
 function renderDiagnostics(data) {
@@ -1960,11 +2020,12 @@ async function checkUpdates() {
   const previous = button.textContent;
   button.disabled = true;
   button.textContent = "检查中...";
+  renderUpdateDialog({ loading: true });
+  openUpdateDialog();
   try {
     const result = await api("/api/update-check");
     saveLatestUpdateResult(result);
     renderUpdateDialog(latestUpdateResult);
-    openUpdateDialog();
     if (!result.configured) {
       pushActivity("warn", "未配置更新地址", "需要设置 release manifest 地址后才能检查更新。");
       return;
@@ -1987,17 +2048,32 @@ async function checkUpdates() {
 }
 
 function openUpdateDialog() {
-  document.querySelector("#update-dialog").showModal();
+  openDialogCompat("#update-dialog");
 }
 
 function closeUpdateDialog() {
-  document.querySelector("#update-dialog").close();
+  closeDialogCompat("#update-dialog");
 }
 
 function renderUpdateDialog(result = {}) {
   const container = document.querySelector("#update-result");
   const downloadButton = document.querySelector("#open-update-download");
   if (!container || !downloadButton) return;
+
+  if (result.loading) {
+    downloadButton.hidden = true;
+    downloadButton.dataset.url = "";
+    container.innerHTML = `
+      <article class="update-status-card">
+        <div class="update-status-topline">
+          <strong>正在检查更新</strong>
+          <span class="update-status-badge" data-tone="info">处理中</span>
+        </div>
+        <p>正在读取最新版本信息，请稍候。</p>
+      </article>
+    `;
+    return;
+  }
 
   if (result.error) {
     downloadButton.hidden = true;
@@ -2074,10 +2150,10 @@ async function openChangelogDialog() {
       changelogEntries = result.entries || [];
     }
     renderChangelogDialog(changelogEntries);
-    document.querySelector("#changelog-dialog").showModal();
+    openDialogCompat("#changelog-dialog");
   } catch (error) {
     renderChangelogDialog([], error.message);
-    document.querySelector("#changelog-dialog").showModal();
+    openDialogCompat("#changelog-dialog");
     pushActivity("error", "读取更新记录失败", error.message);
   } finally {
     if (button) {
@@ -2088,7 +2164,7 @@ async function openChangelogDialog() {
 }
 
 function closeChangelogDialog() {
-  document.querySelector("#changelog-dialog").close();
+  closeDialogCompat("#changelog-dialog");
 }
 
 function renderChangelogDialog(entries = [], errorMessage = "") {
@@ -2639,11 +2715,39 @@ document.querySelector("#copy-mcp-message").addEventListener("click", () => {
 });
 document.querySelector("#open-feedback-issues").addEventListener("click", () => {
   const url = issueFeedbackUrl();
+  const button = document.querySelector("#open-feedback-issues");
   if (!url) {
     pushActivity("error", "未找到反馈地址", "当前版本没有配置 GitHub Issues 地址。");
     return;
   }
-  window.open(url, "_blank", "noopener,noreferrer");
+  const previous = button?.textContent || "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "打开中...";
+  }
+  openExternalUrl(url)
+    .then(async (opened) => {
+      if (opened) {
+        pushActivity("success", "已打开反馈页面", url);
+        return;
+      }
+      await copyTextValue(url);
+      pushActivity("warn", "无法直接打开反馈页面", "已自动复制反馈地址，请手动打开。");
+    })
+    .catch(async () => {
+      try {
+        await copyTextValue(url);
+        pushActivity("warn", "无法直接打开反馈页面", "已自动复制反馈地址，请手动打开。");
+      } catch (error) {
+        pushActivity("error", "打开反馈页面失败", error.message || "当前环境不允许直接打开外部链接。");
+      }
+    })
+    .finally(() => {
+      if (button) {
+        button.disabled = false;
+        button.textContent = previous;
+      }
+    });
 });
 document.querySelector("#check-updates").addEventListener("click", () => {
   checkUpdates().catch((error) => pushActivity("error", "检查更新失败", error.message));
@@ -2662,7 +2766,11 @@ document.querySelector("#open-changelog-from-update").addEventListener("click", 
 document.querySelector("#open-update-download").addEventListener("click", (event) => {
   const url = event.currentTarget.dataset.url || "";
   if (!url) return;
-  window.open(url, "_blank", "noopener,noreferrer");
+  openExternalUrl(url).then((opened) => {
+    if (!opened) {
+      pushActivity("error", "打开下载地址失败", "当前环境不允许直接打开外部链接。");
+    }
+  });
 });
 document.querySelector("#close-changelog-dialog").addEventListener("click", closeChangelogDialog);
 document.querySelector("#changelog-list").addEventListener("click", (event) => {

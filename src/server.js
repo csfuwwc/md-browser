@@ -61,6 +61,21 @@ function sendJson(res, status, body) {
   res.end(`${JSON.stringify(body, null, 2)}\n`);
 }
 
+function openExternalUrl(url) {
+  const target = String(url || "").trim();
+  if (!/^https?:\/\//i.test(target)) {
+    const error = new Error("仅支持打开 http 或 https 链接。");
+    error.statusCode = 400;
+    throw error;
+  }
+  const child = spawn("open", [target], {
+    detached: true,
+    stdio: "ignore"
+  });
+  child.unref();
+  return { opened: true, url: target };
+}
+
 async function readJson(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -364,10 +379,22 @@ export function defaultUpdateManifestUrl({ packagePath = join(rootDir, "package.
     const match = source.match(/github\.com\/([^/]+)\/([^/#]+)/i);
     if (!match) return "";
     const [, owner, repo] = match;
-    return `https://github.com/${owner}/${repo}/releases/latest/download/latest.json`;
+    return `https://github.com/${owner}/${repo}/releases/latest/download/latest-mac-arm64.json`;
   } catch {
     return "";
   }
+}
+
+function candidateManifestUrls(manifestUrl) {
+  const primary = String(manifestUrl || "").trim();
+  if (!primary) return [];
+  const urls = [primary];
+  if (primary.endsWith("/latest-mac-arm64.json")) {
+    urls.push(primary.replace(/latest-mac-arm64\.json$/, "latest.json"));
+  } else if (primary.endsWith("/latest.json")) {
+    urls.push(primary.replace(/latest\.json$/, "latest-mac-arm64.json"));
+  }
+  return [...new Set(urls)];
 }
 
 function resolveManifestPlatformEntry(manifest) {
@@ -421,18 +448,32 @@ export async function checkForUpdate({
 } = {}) {
   const resolvedManifestUrl = manifestUrl || defaultUpdateManifestUrl({ packagePath });
   if (!resolvedManifestUrl) return { configured: false, currentVersion, updateAvailable: false };
-  const response = await fetchImpl(resolvedManifestUrl, { signal: AbortSignal.timeout(5000) });
-  if (!response.ok) throw new Error(`更新清单读取失败: ${response.status}`);
+  const manifestUrls = candidateManifestUrls(resolvedManifestUrl);
+  let response;
+  let usedManifestUrl = resolvedManifestUrl;
+  let lastStatus = 0;
+  for (const candidate of manifestUrls) {
+    response = await fetchImpl(candidate, { signal: AbortSignal.timeout(5000) });
+    if (response.ok) {
+      usedManifestUrl = candidate;
+      break;
+    }
+    lastStatus = response.status;
+    if (response.status !== 404) {
+      throw new Error(`更新清单读取失败: ${response.status}`);
+    }
+  }
+  if (!response?.ok) throw new Error(`更新清单读取失败: ${lastStatus || 404}`);
   const manifest = await response.json();
   const normalizedManifest = normalizeUpdateManifest(manifest);
   const latestVersion = normalizedManifest.version || "";
-  const resolvedDownloadUrl = resolveManifestDownloadUrl(normalizedManifest.downloadUrl || "", resolvedManifestUrl);
+  const resolvedDownloadUrl = resolveManifestDownloadUrl(normalizedManifest.downloadUrl || "", usedManifestUrl);
   return {
     configured: true,
     currentVersion,
     latestVersion,
     updateAvailable: compareVersions(latestVersion, currentVersion) > 0,
-    manifestUrl: resolvedManifestUrl,
+    manifestUrl: usedManifestUrl,
     downloadUrl: resolvedDownloadUrl,
     fileName: normalizedManifest.fileName || "",
     sha256: normalizedManifest.sha256 || "",
@@ -598,6 +639,11 @@ async function handleApi(req, res) {
     return sendJson(res, 200, await resolveReleaseDownloadLink({
       version: url.searchParams.get("version") || ""
     }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/open-external") {
+    const body = await readJson(req);
+    return sendJson(res, 200, openExternalUrl(body.url));
   }
 
   if (url.pathname.startsWith("/api/agent/") && config.agent?.mcpEnabled === false) {
