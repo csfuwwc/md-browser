@@ -64,24 +64,24 @@ npm run mcp
 
 ## Build the macOS App
 
-Unsigned local package:
+Build the Tauri macOS app:
 
 ```bash
 npm run package:mac
 ```
 
-If macOS blocks the unsigned build during internal testing, remove the quarantine flag and reopen the app:
+Build output:
+
+```text
+src-tauri/target/release/bundle/macos/MD-Browser.app
+src-tauri/target/release/bundle/dmg/MD-Browser_<version>_aarch64.dmg
+```
+
+If macOS blocks an unsigned internal build during testing, remove the quarantine flag and reopen the app:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/MD-Browser.app
 open /Applications/MD-Browser.app
-```
-
-Signed package flow:
-
-```bash
-npm run package:mac:signed
-npm run verify:mac:signed
 ```
 
 Release manifest generation:

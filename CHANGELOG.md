@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.0 - 2026-06-14
+
+### Added
+
+- 完成 Tauri 桌面壳迁移，统一产出 `.app` 与 `.dmg`，为后续签名、公证和原生升级链路打基础。
+- 发布清单同时支持团队现有 DMG manifest 和 Tauri `latest.json` 更新清单。
+
+### Changed
+
+- 项目正式版本号升级到 `1.0.0`。
+- 默认更新清单地址切换为 GitHub Releases 的 `latest.json`，服务端兼容旧清单与 Tauri 清单两种格式。
+- 设置页版本信息区继续收口，移除“最近检查状态”文案，只保留核心操作。
+
+### Fixed
+
+- 检查更新逻辑现在能正确解析 Tauri `platforms.darwin-aarch64` 结构。
+- 清理 Electron 遗留发布脚本和旧产物入口，避免后续发布链路混用。
+
 ## v0.3.1 - 2026-06-14
 
 ### Changed

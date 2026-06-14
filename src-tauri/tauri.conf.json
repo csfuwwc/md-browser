@@ -1,0 +1,35 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "MD-Browser",
+  "version": "1.0.0",
+  "identifier": "com.local.md-browser",
+  "build": {
+    "frontendDist": "../dist-tauri/web",
+    "devUrl": "http://127.0.0.1:18777",
+    "beforeDevCommand": "npm start",
+    "beforeBuildCommand": "npm run tauri:web && npm run tauri:prepare"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "resources": [
+      "../.tauri-bundle/runtime/node",
+      "../.tauri-bundle/app"
+    ],
+    "icon": [
+      "../build/icon.icns"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    }
+  }
+}

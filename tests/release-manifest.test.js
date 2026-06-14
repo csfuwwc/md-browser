@@ -1,60 +1,115 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createRequire } from "node:module";
 
+import { checkForUpdate, normalizeUpdateManifest } from "../src/server.js";
+
 const require = createRequire(import.meta.url);
-const { buildReleaseManifest, normalizeBaseUrl, sha256, writeReleaseManifest } = require("../scripts/release_manifest.cjs");
+const {
+  buildLegacyReleaseManifest,
+  buildTauriReleaseManifest
+} = require("../scripts/release_manifest.cjs");
 
-test("normalizeBaseUrl removes trailing slashes", () => {
-  assert.equal(normalizeBaseUrl("https://downloads.example.com/md///"), "https://downloads.example.com/md");
-  assert.equal(normalizeBaseUrl(""), "");
+function tempWorkspace() {
+  return mkdtempSync(join(tmpdir(), "md-browser-release-"));
+}
+
+test("buildLegacyReleaseManifest keeps existing DMG manifest shape", () => {
+  const root = tempWorkspace();
+  const pkgPath = join(root, "package.json");
+  const artifactPath = join(root, "MD-Browser_0.3.1_aarch64.dmg");
+  writeFileSync(pkgPath, JSON.stringify({ version: "0.3.1", productName: "MD-Browser" }));
+  writeFileSync(artifactPath, "fake-dmg");
+
+  const manifest = buildLegacyReleaseManifest({
+    packagePath: pkgPath,
+    artifactPath,
+    downloadBaseUrl: "https://example.com/releases",
+    notes: ["first", "second"]
+  });
+
+  assert.equal(manifest.version, "0.3.1");
+  assert.equal(manifest.fileName, "MD-Browser_0.3.1_aarch64.dmg");
+  assert.equal(manifest.downloadUrl, "https://example.com/releases/MD-Browser_0.3.1_aarch64.dmg");
+  assert.deepEqual(manifest.notes, ["first", "second"]);
 });
 
-test("buildReleaseManifest writes version, download URL, SHA and size", () => {
-  const dir = mkdtempSync(join(tmpdir(), "md-browser-release-manifest-"));
-  try {
-    const packagePath = join(dir, "package.json");
-    const artifactPath = join(dir, "MD-Browser-0.2.0-arm64.dmg");
-    const outputPath = join(dir, "latest-mac-arm64.json");
+test("buildTauriReleaseManifest creates latest.json shape", () => {
+  const root = tempWorkspace();
+  const pkgPath = join(root, "package.json");
+  const bundleDir = join(root, "bundle");
+  mkdirSync(bundleDir, { recursive: true });
+  const artifactPath = join(bundleDir, "MD-Browser.app.tar.gz");
+  const signaturePath = `${artifactPath}.sig`;
+  writeFileSync(pkgPath, JSON.stringify({ version: "0.3.1", productName: "MD-Browser" }));
+  writeFileSync(artifactPath, "fake-updater");
+  writeFileSync(signaturePath, "signed-content");
 
-    writeFileSync(packagePath, JSON.stringify({
-      version: "0.2.0",
-      build: { productName: "MD-Browser" }
-    }));
-    writeFileSync(artifactPath, "fake-dmg");
+  const manifest = buildTauriReleaseManifest({
+    packagePath: pkgPath,
+    artifactPath,
+    signaturePath,
+    downloadBaseUrl: "https://example.com/releases",
+    notes: ["a", "b"],
+    pubDate: "2026-06-14T12:00:00Z"
+  });
 
-    const manifest = buildReleaseManifest({
-      packagePath,
-      artifactPath,
-      downloadBaseUrl: "https://downloads.example.com/md-browser/",
-      channel: "beta",
-      notes: ["诊断信息", "内置 Mihomo"]
-    });
-    writeReleaseManifest(manifest, outputPath);
-    const saved = JSON.parse(readFileSync(outputPath, "utf8"));
-
-    assert.equal(saved.productName, "MD-Browser");
-    assert.equal(saved.version, "0.2.0");
-    assert.equal(saved.channel, "beta");
-    assert.equal(saved.downloadUrl, "https://downloads.example.com/md-browser/MD-Browser-0.2.0-arm64.dmg");
-    assert.equal(saved.sha256, "a93b94ffef56a7c5cd60bba382e95a01fec5e0a580b9a1d3f7e78f8a54b8432f");
-    assert.equal(saved.size, 8);
-    assert.deepEqual(saved.notes, ["诊断信息", "内置 Mihomo"]);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  assert.equal(manifest.version, "0.3.1");
+  assert.equal(manifest.pub_date, "2026-06-14T12:00:00Z");
+  assert.equal(manifest.notes, "a\nb");
+  assert.equal(manifest.platforms["darwin-aarch64"].signature, "signed-content");
+  assert.equal(
+    manifest.platforms["darwin-aarch64"].url,
+    "https://example.com/releases/MD-Browser.app.tar.gz"
+  );
 });
 
-test("sha256 returns stable artifact checksum", () => {
-  const dir = mkdtempSync(join(tmpdir(), "md-browser-release-sha-"));
-  try {
-    const artifactPath = join(dir, "artifact.dmg");
-    writeFileSync(artifactPath, "fake-dmg");
-    assert.equal(sha256(artifactPath), "a93b94ffef56a7c5cd60bba382e95a01fec5e0a580b9a1d3f7e78f8a54b8432f");
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+test("normalizeUpdateManifest accepts tauri static JSON", () => {
+  const normalized = normalizeUpdateManifest({
+    version: "0.4.0",
+    notes: "line 1\n- line 2",
+    pub_date: "2026-06-14T12:00:00Z",
+    platforms: {
+      "darwin-aarch64": {
+        url: "https://example.com/MD-Browser.app.tar.gz",
+        signature: "signed-content"
+      }
+    }
+  });
+
+  assert.equal(normalized.version, "0.4.0");
+  assert.equal(normalized.downloadUrl, "https://example.com/MD-Browser.app.tar.gz");
+  assert.equal(normalized.signature, "signed-content");
+  assert.deepEqual(normalized.notes, ["line 1", "line 2"]);
+});
+
+test("checkForUpdate supports tauri latest.json", async () => {
+  const result = await checkForUpdate({
+    currentVersion: "0.3.1",
+    manifestUrl: "https://example.com/latest.json",
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          version: "0.4.0",
+          notes: "fix 1\nfix 2",
+          platforms: {
+            "darwin-aarch64": {
+              url: "MD-Browser.app.tar.gz",
+              signature: "signed"
+            }
+          }
+        };
+      }
+    })
+  });
+
+  assert.equal(result.updateAvailable, true);
+  assert.equal(result.latestVersion, "0.4.0");
+  assert.equal(result.downloadUrl, "https://example.com/MD-Browser.app.tar.gz");
+  assert.deepEqual(result.notes, ["fix 1", "fix 2"]);
+  assert.equal(result.signature, "signed");
 });

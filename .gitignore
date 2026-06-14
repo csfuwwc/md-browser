@@ -1,6 +1,9 @@
 node_modules/
 dist/
 dist-signed/
+dist-tauri/
+.tauri-bundle/
+src-tauri/target/
 coverage/
 
 .DS_Store

@@ -6,35 +6,34 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 ## 发布包类型
 
-当前保留两条打包线：
+当前主打包线已经切到 Tauri：
 
-- 本地调试包：`npm run package:mac`
-- 正式签名包：`npm run package:mac:signed`
+- 本地调试 / 内测打包：`npm run package:mac`
 
-本地调试包不会签名，适合快速看产品效果。正式签名包会输出到 `dist-signed/`，用于发给同事安装。
+当前 `package:mac` 会输出 Tauri 的 `.app` 和 `.dmg`，用于本机验证或团队内测。
 
 ## 当前内测构建
 
-- 版本：`0.3.1`
+- 版本：`1.0.0`
 - 架构：Apple Silicon / arm64，适用于 M 系列 Mac
-- 本地安装包：`~/Downloads/MD-Browser-0.3.1-arm64.dmg`
-- SHA-256：`8fbecbdd8f03fdd75f0c1a094be6cf718e0fbb5d8afd50a792636b29fef298b7`
+- 本地安装包：`~/Downloads/MD-Browser_1.0.0_aarch64.dmg`
+- SHA-256：`5fe07511fb1145490bccf66122c336379ca0bffc876b8cb49585de7ee94c9df8`
 - 构建时间：`2026-06-14 15:16 CST`
 - 签名状态：未签名、未公证，仅适合本机或内部临时验证
 - 已验证：测试通过；打包后需验证 DMG 校验和本地 `/api/status` 版本。
 - 正式签名前置检查：`2026-06-12 15:00 CST` 已执行，当前缺少 `Developer ID Application` 证书和 Apple 公证凭据
 
-这个构建包含内置 Mihomo 的“一键安装并启用”、填写订阅后自动保存设置并切换为内置后端、优先选择普通 `darwin-arm64` Mihomo 二进制、旧配置迁移前备份、设置页诊断信息卡片、节点页代理后端状态、设置页版本显示、团队配置导入导出、发布清单生成、客户端检查更新和脱敏排障包导出等当前内测功能。
+这个构建包含内置 Mihomo 的“一键安装并启用”、填写订阅后自动保存设置并切换为内置后端、优先选择普通 `darwin-arm64` Mihomo 二进制、旧配置迁移前备份、节点页代理后端状态、设置页版本信息卡片、团队配置导入导出、发布清单生成、客户端检查更新和脱敏排障包导出等当前内测功能。
 
 ## 内测包安装方式
 
-当前 `package:mac` 输出的是未签名、未公证包，适合产品验证，不适合作为长期团队正式分发包。未签名链路默认关闭 hardened runtime，目标是让包处于“可移除隔离后运行”的状态，而不是生成签名异常包。
+当前 `package:mac` 输出的是未签名、未公证的 Tauri 包，适合产品验证，不适合作为长期团队正式分发包。
 
 面向团队成员的简版说明见：[MD-Browser 团队内测安装与首次配置](team-install-guide.md)。
 
 安装步骤：
 
-1. 打开 `~/Downloads/MD-Browser-0.3.1-arm64.dmg`。
+1. 打开 `~/Downloads/MD-Browser_1.0.0_aarch64.dmg`。
 2. 把 `MD-Browser.app` 拖到 `/Applications`。
 3. 如果 macOS 提示无法打开，先用访达右键 `MD-Browser.app` 选择“打开”。
 4. 如果仍被 Gatekeeper 拦截，内测阶段可以执行：
@@ -87,25 +86,21 @@ npm version patch
 npm test
 ```
 
-3. 生成签名和公证后的 Apple Silicon 安装包。
+3. 生成 Apple Silicon 安装包。
 
 ```bash
-npm run package:mac:signed
+npm run package:mac
 ```
 
-正式打包会先执行 preflight：检查 `Developer ID Application` 证书，以及 App Store Connect API Key 或 Apple ID 公证凭据。缺少任一项会提前失败，不会继续生成半成品。
+当前仓库已经切到 Tauri 桌面壳，后续 Apple 签名、公证和 Gatekeeper 校验也会基于 Tauri 产物补齐，不再走 Electron Builder。
 
-4. 验证签名、公证和 Gatekeeper。
+4. 分发：
 
-```bash
-npm run verify:mac:signed
+```text
+src-tauri/target/release/bundle/dmg/MD-Browser_<version>_aarch64.dmg
 ```
 
-这个脚本会依次执行 `codesign --verify`、`xcrun stapler validate`、`spctl --assess` 和 `hdiutil verify`。
-
-5. 分发 `dist-signed/*.dmg`。
-
-6. 生成版本清单。
+5. 生成版本清单。
 
 ```bash
 MD_BROWSER_RELEASE_BASE_URL=https://example.com/downloads \
@@ -128,13 +123,19 @@ dist/release-notes-v<version>.md
 dist/release-summary-v<version>.json
 ```
 
-默认会读取当前版本的 `dist/MD-Browser-<version>-arm64.dmg`，生成：
+默认会读取当前版本的 Tauri 安装包，生成：
 
 ```text
 dist/latest-mac-arm64.json
 ```
 
-如果使用正式签名包，可以通过 `MD_BROWSER_RELEASE_ARTIFACT` 指向 `dist-signed/` 下的 `.dmg`。清单里包含版本号、渠道、文件名、下载地址、文件大小和 SHA-256，后续客户端升级提醒会读取这份清单。
+如果当前构建同时带有 Tauri updater 产物 `.app.tar.gz` 和 `.sig`，还会额外生成：
+
+```text
+dist-tauri/latest.json
+```
+
+可以通过 `MD_BROWSER_RELEASE_ARTIFACT` 显式指定要发布的 `.dmg` 文件。清单里包含版本号、渠道、文件名、下载地址、文件大小和 SHA-256；`dist-tauri/latest.json` 则用于后续 Tauri 原生更新链路。
 
 ## 客户端升级策略
 
@@ -153,28 +154,30 @@ dist/latest-mac-arm64.json
 
 ### 阶段 2：半自动升级提醒
 
-客户端启动时读取一个远端版本文件，例如：
+客户端启动时读取一个远端版本文件。当前兼容两种格式：
+
+- 现有 DMG 发布清单：`latest-mac-arm64.json`
+- 未来 Tauri 原生更新清单：`latest.json`
+
+Tauri `latest.json` 示例：
 
 ```json
 {
-  "productName": "MD-Browser",
-  "version": "0.3.1",
-  "channel": "internal",
-  "platform": "mac",
-  "arch": "arm64",
-  "fileName": "MD-Browser-0.3.1-arm64.dmg",
-  "downloadUrl": "https://example.com/MD-Browser-0.3.1-arm64.dmg",
-  "sha256": "....",
-  "size": 123456789,
-  "generatedAt": "2026-06-12T07:30:00.000Z",
-  "minimumConfigVersion": 1,
-  "notes": ["优化节点绑定", "修复启动日志"]
+  "version": "1.0.0",
+  "notes": "优化节点绑定\n修复启动日志",
+  "pub_date": "2026-06-14T09:30:00.000Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "url": "https://example.com/MD-Browser.app.tar.gz",
+      "signature": "..."
+    }
+  }
 }
 ```
 
-如果远端版本高于本地版本，客户端会在“设置”的诊断信息卡片里提示“发现新版本”。这个阶段不在客户端内自动替换 App，风险低。
+如果远端版本高于本地版本，客户端会在“设置”的版本信息卡片里提示“发现新版本”。这个阶段不在客户端内自动替换 App，风险低。
 
-`v0.3.1` 已实现这个阶段的基础接口和按钮：
+`v1.0.0` 已实现这个阶段的基础接口和按钮：
 
 - `GET /api/update-check`：读取 release manifest，判断是否有新版。
 - “检查更新”按钮：在页面运行日志里显示结果。
@@ -182,7 +185,7 @@ dist/latest-mac-arm64.json
 
 ## 排障包策略
 
-`v0.3.1` 起，设置页支持导出排障包。排障包用于团队成员遇到问题时发给负责人定位，不需要用户打开本机配置文件。
+`v1.0.0` 起，设置页支持导出排障包。排障包用于团队成员遇到问题时发给负责人定位，不需要用户打开本机配置文件。
 
 排障包包含：
 
@@ -207,7 +210,7 @@ dist/latest-mac-arm64.json
 
 推荐路线：
 
-- 使用 `electron-updater`
+- 使用 Tauri 原生更新链路
 - 发布渠道分成 `latest` 和 `beta`
 - 更新元数据与安装包放在 GitHub Releases、S3、OSS 或公司内部分发域名
 - 每次发布都必须签名、公证、staple

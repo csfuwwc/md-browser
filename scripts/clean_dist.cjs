@@ -3,7 +3,7 @@ const { rmSync } = require("node:fs");
 const { resolve } = require("node:path");
 
 const root = resolve(__dirname, "..");
-const allowed = new Set(["dist", "dist-signed"]);
+const allowed = new Set(["dist", "dist-tauri", "src-tauri/target/release/bundle"]);
 const targets = process.argv.slice(2);
 
 for (const target of targets) {

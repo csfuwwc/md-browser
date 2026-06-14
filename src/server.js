@@ -356,10 +356,53 @@ export function defaultUpdateManifestUrl({ packagePath = join(rootDir, "package.
     const match = source.match(/github\.com\/([^/]+)\/([^/#]+)/i);
     if (!match) return "";
     const [, owner, repo] = match;
-    return `https://github.com/${owner}/${repo}/releases/latest/download/latest-mac-arm64.json`;
+    return `https://github.com/${owner}/${repo}/releases/latest/download/latest.json`;
   } catch {
     return "";
   }
+}
+
+function resolveManifestPlatformEntry(manifest) {
+  const platforms = manifest?.platforms;
+  if (!platforms || typeof platforms !== "object") return null;
+  return platforms["darwin-aarch64"]
+    || platforms["darwin-arm64"]
+    || platforms["darwin-x86_64"]
+    || Object.values(platforms).find((entry) => entry?.url && entry?.signature)
+    || null;
+}
+
+function normalizeManifestNotes(notes) {
+  if (Array.isArray(notes)) return notes.filter(Boolean);
+  if (typeof notes === "string") {
+    return notes
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^-\s*/, "").trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+export function normalizeUpdateManifest(manifest = {}) {
+  const platformEntry = resolveManifestPlatformEntry(manifest);
+  if (platformEntry) {
+    return {
+      version: manifest.version || "",
+      downloadUrl: platformEntry.url || "",
+      signature: platformEntry.signature || "",
+      notes: normalizeManifestNotes(manifest.notes),
+      pubDate: manifest.pub_date || ""
+    };
+  }
+  return {
+    version: manifest.version || "",
+    downloadUrl: manifest.downloadUrl || "",
+    fileName: manifest.fileName || "",
+    sha256: manifest.sha256 || "",
+    signature: manifest.signature || "",
+    notes: normalizeManifestNotes(manifest.notes),
+    pubDate: manifest.pub_date || ""
+  };
 }
 
 export async function checkForUpdate({
@@ -373,8 +416,9 @@ export async function checkForUpdate({
   const response = await fetchImpl(resolvedManifestUrl, { signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error(`更新清单读取失败: ${response.status}`);
   const manifest = await response.json();
-  const latestVersion = manifest.version || "";
-  const resolvedDownloadUrl = resolveManifestDownloadUrl(manifest.downloadUrl || "", resolvedManifestUrl);
+  const normalizedManifest = normalizeUpdateManifest(manifest);
+  const latestVersion = normalizedManifest.version || "";
+  const resolvedDownloadUrl = resolveManifestDownloadUrl(normalizedManifest.downloadUrl || "", resolvedManifestUrl);
   return {
     configured: true,
     currentVersion,
@@ -382,9 +426,11 @@ export async function checkForUpdate({
     updateAvailable: compareVersions(latestVersion, currentVersion) > 0,
     manifestUrl: resolvedManifestUrl,
     downloadUrl: resolvedDownloadUrl,
-    fileName: manifest.fileName || "",
-    sha256: manifest.sha256 || "",
-    notes: Array.isArray(manifest.notes) ? manifest.notes : []
+    fileName: normalizedManifest.fileName || "",
+    sha256: normalizedManifest.sha256 || "",
+    signature: normalizedManifest.signature || "",
+    pubDate: normalizedManifest.pubDate || "",
+    notes: normalizedManifest.notes
   };
 }
 

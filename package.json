@@ -1,6 +1,6 @@
 {
   "name": "md-browser",
-  "version": "0.3.1",
+  "version": "1.0.0",
   "description": "Local browser profile and proxy route manager for team workflows.",
   "author": "MD-Browser contributors",
   "license": "MIT",
@@ -14,19 +14,20 @@
   },
   "homepage": "https://github.com/csfuwwc/md-browser#readme",
   "type": "module",
-  "main": "electron/main.cjs",
   "scripts": {
     "start": "node src/server.js",
     "mcp": "node mcp/md-browser-mcp.js",
-    "desktop": "electron .",
+    "desktop": "npm run tauri:dev",
+    "tauri:web": "node scripts/build_tauri_web.cjs",
+    "tauri:prepare": "node scripts/prepare_tauri_bundle.cjs",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:signer:generate": "tauri signer generate -w ~/.tauri/md-browser.key",
     "test": "node --test tests/*.test.js",
-    "clean:dist": "node scripts/clean_dist.cjs dist dist-signed",
-    "prepackage:mac": "npm run clean:dist",
-    "package:mac": "electron-builder --mac dmg zip --arm64",
-    "prepackage:mac:signed": "npm run clean:dist && node scripts/preflight_signed_mac.cjs",
-    "package:mac:signed": "electron-builder --config electron-builder.signed.yml --mac dmg zip --arm64",
-    "verify:mac:signed": "node scripts/verify_signed_mac.cjs",
+    "clean:dist": "node scripts/clean_dist.cjs dist dist-tauri src-tauri/target/release/bundle",
+    "package:mac": "npm run tauri:build",
     "release:manifest": "node scripts/release_manifest.cjs",
+    "release:manifest:tauri": "MD_BROWSER_RELEASE_MANIFEST_FORMAT=tauri node scripts/release_manifest.cjs",
     "release:prepare": "node scripts/prepare_release.cjs"
   },
   "engines": {
@@ -36,38 +37,6 @@
     "lucide-static": "^1.17.0"
   },
   "devDependencies": {
-    "electron": "^42.4.0",
-    "electron-builder": "^26.15.2"
-  },
-  "build": {
-    "appId": "com.local.md-browser",
-    "productName": "MD-Browser",
-    "asar": true,
-    "afterPack": "scripts/postprocess_unsigned_mac.cjs",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "electron/**/*",
-      "src/**/*",
-      "web/**/*",
-      "build/icon.icns",
-      "config/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "category": "public.app-category.productivity",
-      "icon": "build/icon.icns",
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "identity": null,
-      "hardenedRuntime": false
-    },
-    "dmg": {
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
-    }
+    "@tauri-apps/cli": "^2.11.2"
   }
 }

@@ -43,10 +43,25 @@ const PAGE_META = {
   activity: { eyebrow: "Activity Stream", title: "运行日志" }
 };
 
+const DEFAULT_SERVICE_URL = "http://127.0.0.1:18777";
+
+function serviceBaseUrl() {
+  const metaUrl = document
+    .querySelector('meta[name="md-browser-service-url"]')
+    ?.getAttribute("content")
+    ?.trim();
+  const baseUrl = metaUrl || DEFAULT_SERVICE_URL;
+  return baseUrl.replace(/\/+$/, "");
+}
+
+function apiUrl(path) {
+  return new URL(path, `${serviceBaseUrl()}/`).toString();
+}
+
 async function api(path, options) {
   let response;
   try {
-    response = await fetch(path, options);
+    response = await fetch(apiUrl(path), options);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/Failed to fetch/i.test(message)) {
@@ -338,39 +353,16 @@ function renderSettingsBasics(app = currentAppInfo) {
     versionDetailNode.textContent = app?.version ? `v${app.version}` : "未读取到版本号";
   }
   if (localUrlNode) {
-    localUrlNode.value = window.location.origin;
+    localUrlNode.value = serviceBaseUrl();
   }
   const mcpMessage = document.querySelector("#settings-mcp-message");
-  if (mcpMessage) mcpMessage.value = `请安装这个 MCP：${window.location.origin}/mcp`;
-  renderVersionStatus();
+  if (mcpMessage) mcpMessage.value = `请安装这个 MCP：${serviceBaseUrl()}/mcp`;
 }
 
 function renderDiagnostics(data) {
   const versionDetailNode = document.querySelector("#settings-version-detail");
   if (!versionDetailNode || !data) return;
   if (!currentAppInfo?.version) versionDetailNode.textContent = "未读取到版本号";
-}
-
-function renderVersionStatus(result = latestUpdateResult) {
-  const node = document.querySelector("#settings-version-status");
-  if (!node) return;
-  if (!result) {
-    node.dataset.tone = "";
-    node.textContent = "";
-    return;
-  }
-  if (result.error) {
-    node.dataset.tone = "error";
-    node.textContent = "检查更新失败";
-    return;
-  }
-  if (result.updateAvailable) {
-    node.dataset.tone = "info";
-    node.textContent = `发现新版本 v${result.latestVersion}`;
-    return;
-  }
-  node.dataset.tone = result.configured === false ? "warn" : "success";
-  node.textContent = result.configured === false ? "未配置更新源" : "";
 }
 
 function renderSettingsForm(config) {

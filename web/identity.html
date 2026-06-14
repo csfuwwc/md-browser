@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="md-browser-service-url" content="http://127.0.0.1:18777">
     <title>正在读取浏览器配置</title>
     <style>
       :root {
@@ -179,6 +180,15 @@
     <script>
       const params = new URLSearchParams(window.location.search);
       const routeKey = params.get("route");
+      const DEFAULT_SERVICE_URL = "http://127.0.0.1:18777";
+
+      function serviceBaseUrl() {
+        const metaUrl = document
+          .querySelector('meta[name="md-browser-service-url"]')
+          ?.getAttribute("content")
+          ?.trim();
+        return (metaUrl || DEFAULT_SERVICE_URL).replace(/\/+$/, "");
+      }
 
       function text(id, value) {
         document.querySelector(id).textContent = value || "-";
@@ -194,7 +204,7 @@
 
       async function main() {
         try {
-          const response = await fetch("/api/status");
+          const response = await fetch(`${serviceBaseUrl()}/api/status`);
           const data = await response.json();
           const route = data.routes && data.routes[routeKey];
           if (!route) throw new Error("未找到当前浏览器配置。");
