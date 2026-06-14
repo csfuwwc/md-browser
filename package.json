@@ -1,8 +1,8 @@
 {
   "name": "md-browser",
   "version": "0.3.0",
-  "description": "Local browser profile and proxy route manager for cross-border workflows.",
-  "author": "Modian AI",
+  "description": "Local browser profile and proxy route manager for team workflows.",
+  "author": "MD-Browser contributors",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",

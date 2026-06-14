@@ -3,8 +3,8 @@ import test from "node:test";
 import { parseLsofProcesses, terminateTcpPort } from "../src/ports.js";
 
 test("parseLsofProcesses extracts listener process details", () => {
-  assert.deepEqual(parseLsofProcesses("p1234\ncGoogle Chrome\nLliyanpeng\np5678\ncnode\nLroot\n"), [
-    { pid: 1234, command: "Google Chrome", user: "liyanpeng" },
+  assert.deepEqual(parseLsofProcesses("p1234\ncGoogle Chrome\nLlocaluser\np5678\ncnode\nLroot\n"), [
+    { pid: 1234, command: "Google Chrome", user: "localuser" },
     { pid: 5678, command: "node", user: "root" }
   ]);
 });
@@ -20,8 +20,8 @@ test("terminateTcpPort sends SIGTERM to port listener processes", async () => {
         listening: calls === 1,
         processes: calls === 1
           ? [
-              { pid: 1234, command: "Google Chrome", user: "liyanpeng" },
-              { pid: process.pid, command: "node", user: "liyanpeng" }
+              { pid: 1234, command: "Google Chrome", user: "localuser" },
+              { pid: process.pid, command: "node", user: "localuser" }
             ]
           : []
       };
@@ -31,7 +31,7 @@ test("terminateTcpPort sends SIGTERM to port listener processes", async () => {
   });
 
   assert.deepEqual(killed, [[1234, "SIGTERM"]]);
-  assert.deepEqual(result.killed, [{ pid: 1234, command: "Google Chrome", user: "liyanpeng", signal: "SIGTERM" }]);
+  assert.deepEqual(result.killed, [{ pid: 1234, command: "Google Chrome", user: "localuser", signal: "SIGTERM" }]);
 });
 
 test("terminateTcpPort escalates to SIGKILL when the listener survives SIGTERM", async () => {
@@ -40,7 +40,7 @@ test("terminateTcpPort escalates to SIGKILL when the listener survives SIGTERM",
     inspectImpl: async () => ({
       port: 9222,
       listening: true,
-      processes: [{ pid: 1234, command: "Google Chrome", user: "liyanpeng" }]
+      processes: [{ pid: 1234, command: "Google Chrome", user: "localuser" }]
     }),
     killImpl: (pid, signal) => killed.push([pid, signal]),
     waitMs: 0
@@ -48,8 +48,8 @@ test("terminateTcpPort escalates to SIGKILL when the listener survives SIGTERM",
 
   assert.deepEqual(killed, [[1234, "SIGTERM"], [1234, "SIGKILL"]]);
   assert.deepEqual(result.killed, [
-    { pid: 1234, command: "Google Chrome", user: "liyanpeng", signal: "SIGTERM" },
-    { pid: 1234, command: "Google Chrome", user: "liyanpeng", signal: "SIGKILL" }
+    { pid: 1234, command: "Google Chrome", user: "localuser", signal: "SIGTERM" },
+    { pid: 1234, command: "Google Chrome", user: "localuser", signal: "SIGKILL" }
   ]);
 });
 
@@ -59,7 +59,7 @@ test("terminateTcpPort leaves processes alone when they are not allowed", async 
     inspectImpl: async () => ({
       port: 9222,
       listening: true,
-      processes: [{ pid: 1234, command: "Google Chrome", user: "liyanpeng", fullCommand: "Google Chrome --remote-debugging-port=9222" }]
+      processes: [{ pid: 1234, command: "Google Chrome", user: "localuser", fullCommand: "Google Chrome --remote-debugging-port=9222" }]
     }),
     killImpl: (pid, signal) => killed.push([pid, signal]),
     shouldTerminate: () => false,

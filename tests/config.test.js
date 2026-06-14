@@ -127,13 +127,13 @@ test("system settings can be updated", () => {
       server: { host: "127.0.0.1", port: 18888 },
       mihomo: {
         controllerUrl: "http://127.0.0.1:9097/",
-        secret: "secret-token",
+        secret: "sample-token",
         mergePath: "~/Merge.yaml",
         runtimePath: "~/clash-verge.yaml"
       },
       embeddedMihomo: {
         controllerUrl: "http://127.0.0.1:19090/",
-        secret: "embedded-secret",
+        secret: "sample-embedded-token",
         binaryPath: "~/bin/mihomo",
         configPath: "~/mihomo/config.yaml",
         subscriptionUrl: "https://example.com/sub",
@@ -148,11 +148,11 @@ test("system settings can be updated", () => {
     assert.equal(config.agent.mcpEnabled, false);
     assert.equal(config.server.port, 18888);
     assert.equal(config.mihomo.controllerUrl, "http://127.0.0.1:9097");
-    assert.equal(config.mihomo.secret, "secret-token");
+    assert.equal(config.mihomo.secret, "sample-token");
     assert.equal(config.mihomo.mergePath, "~/Merge.yaml");
     assert.equal(config.mihomo.runtimePath, "~/clash-verge.yaml");
     assert.equal(config.embeddedMihomo.controllerUrl, "http://127.0.0.1:19090");
-    assert.equal(config.embeddedMihomo.secret, "embedded-secret");
+    assert.equal(config.embeddedMihomo.secret, "sample-embedded-token");
     assert.equal(config.embeddedMihomo.binaryPath, "~/bin/mihomo");
     assert.equal(config.embeddedMihomo.configPath, "~/mihomo/config.yaml");
     assert.equal(config.embeddedMihomo.subscriptionUrl, "https://example.com/sub");
@@ -211,7 +211,7 @@ test("updateRoute persists editable route fields", () => {
   const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
   try {
     const created = createRoute({
-      label: "TikTok US",
+      label: "Example Site US",
       cdpPort: 9222,
       proxyUrl: "http://127.0.0.1:18101"
     }, { homeDir: dir });
@@ -232,7 +232,7 @@ test("updateRoute preserves an empty start URL", () => {
   const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
   try {
     const created = createRoute({
-      label: "TikTok UK",
+      label: "Example Site UK",
       cdpPort: 9225,
       proxyUrl: "http://127.0.0.1:18104"
     }, { homeDir: dir });
@@ -248,19 +248,19 @@ test("createRoute adds a user named browser environment", () => {
   const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
   try {
     const created = createRoute({
-      label: "小红书采集",
+      label: "Content Workspace",
       cdpPort: 9333,
       proxyUrl: "http://127.0.0.1:18333",
-      userDataDir: "/Users/example/SocialScraperProfiles/Xiaohongshu",
+      userDataDir: "/Users/example/BrowserProfiles/Content",
       profileDirectory: "Default",
-      startUrl: "https://www.xiaohongshu.com/",
-      tags: ["XHS", "采集"]
+      startUrl: "https://example.com/content",
+      tags: ["Content", "workspace"]
     }, { homeDir: dir });
-    assert.equal(created.routeKey, "env");
-    assert.equal(created.config.routes.env.cdpPort, 9333);
-    assert.deepEqual(created.config.routes.env.tags, ["XHS", "采集"]);
-    assert.equal("shortLabel" in created.config.routes.env, false);
-    assert.equal("accent" in created.config.routes.env, false);
+    assert.equal(created.routeKey, "content-workspace");
+    assert.equal(created.config.routes["content-workspace"].cdpPort, 9333);
+    assert.deepEqual(created.config.routes["content-workspace"].tags, ["Content", "workspace"]);
+    assert.equal("shortLabel" in created.config.routes["content-workspace"], false);
+    assert.equal("accent" in created.config.routes["content-workspace"], false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -270,16 +270,16 @@ test("createRoute assigns a managed user data dir when none is selected", () => 
   const dir = mkdtempSync(join(tmpdir(), "tk-router-"));
   try {
     const created = createRoute({
-      label: "客户 A / TikTok",
+      label: "客户 A / Example Site",
       cdpPort: 9555,
       proxyUrl: "http://127.0.0.1:18555"
     }, { homeDir: dir });
     const route = created.config.routes[created.routeKey];
-    assert.equal(route.userDataDir, "~/Library/Application Support/MD-Browser/Profiles/客户 A - TikTok");
-    assert.equal(route.profileName, "客户 A - TikTok");
+    assert.equal(route.userDataDir, "~/Library/Application Support/MD-Browser/Profiles/客户 A - Example Site");
+    assert.equal(route.profileName, "客户 A - Example Site");
     assert.equal(route.profileDirectory, "Default");
     assert.equal(
-      existsSync(join(dir, "Library/Application Support/MD-Browser/Profiles/客户 A - TikTok/Default")),
+      existsSync(join(dir, "Library/Application Support/MD-Browser/Profiles/客户 A - Example Site/Default")),
       true
     );
   } finally {

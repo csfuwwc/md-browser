@@ -6,6 +6,7 @@ import test from "node:test";
 import { gzipSync } from "node:zlib";
 import {
   buildEmbeddedMihomoConfig,
+  embeddedRouteGroupName,
   embeddedMihomoPaths,
   embeddedMihomoStatus,
   installEmbeddedMihomo,
@@ -53,19 +54,26 @@ test("selectMihomoReleaseAsset chooses darwin arm64 gz asset", () => {
 test("buildEmbeddedMihomoConfig writes controller, provider and listener config", () => {
   const text = buildEmbeddedMihomoConfig({
     controllerUrl: "http://127.0.0.1:19090",
-    secret: "abc",
+    secret: "sample",
     subscriptionUrl: "https://example.com/sub.yaml"
   }, [
     { label: "tk-us", proxyUrl: "http://127.0.0.1:18101", nodeName: "[HY2]美国001" }
   ]);
 
   assert.match(text, /external-controller: 127\.0\.0\.1:19090/);
-  assert.match(text, /secret: "abc"/);
+  assert.match(text, /secret: "sample"/);
   assert.match(text, /url: "https:\/\/example\.com\/sub\.yaml"/);
   assert.match(text, /name: "tk-us"/);
   assert.match(text, /port: 18101/);
-  assert.match(text, /proxy: "\[HY2\]美国001"/);
+  assert.match(text, /name: "MD-Browser-18101"/);
+  assert.ok(text.includes('filter: "^\\\\[HY2\\\\]美国001$"'));
+  assert.match(text, /proxy: "MD-Browser-18101"/);
+  assert.doesNotMatch(text, /proxy: "\[HY2\]美国001"/);
   assert.doesNotMatch(text, /^mixed-port:/m);
+});
+
+test("embeddedRouteGroupName uses proxy port for stable per-route groups", () => {
+  assert.equal(embeddedRouteGroupName({ proxyUrl: "http://127.0.0.1:18103" }), "MD-Browser-18103");
 });
 
 test("buildEmbeddedMihomoConfig requires a subscription URL", () => {
@@ -229,7 +237,9 @@ test("startEmbeddedMihomo writes config and pid file with injected spawner", () 
     assert.equal(result.started, true);
     assert.equal(result.pid, 12345);
     assert.equal(readFileSync(join(home, "mihomo/mihomo.pid"), "utf8"), "12345");
-    assert.match(readFileSync(join(home, "mihomo/config.yaml"), "utf8"), /proxy: "US-Node"/);
+    const generatedConfig = readFileSync(join(home, "mihomo/config.yaml"), "utf8");
+    assert.match(generatedConfig, /filter: "\^US-Node\$"/);
+    assert.match(generatedConfig, /proxy: "MD-Browser-18101"/);
     assert.equal(calls[0].binary, join(home, "bin/mihomo"));
     assert.deepEqual(calls[0].args, ["-f", join(home, "mihomo/config.yaml")]);
   } finally {

@@ -340,7 +340,7 @@ function normalizeRouteInput(input = {}, options = {}) {
   return {
     label,
     country: String(route.country || "").trim(),
-    startUrl: route.startUrl === undefined ? "https://www.tiktok.com/" : String(route.startUrl).trim(),
+    startUrl: route.startUrl === undefined ? "https://www.google.com/" : String(route.startUrl).trim(),
     tags,
     note: String(route.note || "").trim(),
     cdpPort,

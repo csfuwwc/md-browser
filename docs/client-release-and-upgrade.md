@@ -17,7 +17,7 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 - 版本：`0.3.0`
 - 架构：Apple Silicon / arm64，适用于 M 系列 Mac
-- 本地安装包：`/Users/liyanpeng/Downloads/MD-Browser-0.3.0-arm64.dmg`
+- 本地安装包：`~/Downloads/MD-Browser-0.3.0-arm64.dmg`
 - SHA-256：`152f4cad4402fd9b4ce3ccd274d04a685526d90e0639bf0ee3f25ed1d034946f`
 - 构建时间：`2026-06-14 15:16 CST`
 - 签名状态：未签名、未公证，仅适合本机或内部临时验证
@@ -34,7 +34,7 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 安装步骤：
 
-1. 打开 `/Users/liyanpeng/Downloads/MD-Browser-0.3.0-arm64.dmg`。
+1. 打开 `~/Downloads/MD-Browser-0.3.0-arm64.dmg`。
 2. 把 `MD-Browser.app` 拖到 `/Applications`。
 3. 如果 macOS 提示无法打开，先用访达右键 `MD-Browser.app` 选择“打开”。
 4. 如果仍被 Gatekeeper 拦截，内测阶段可以执行：
@@ -109,7 +109,7 @@ npm run verify:mac:signed
 
 ```bash
 MD_BROWSER_RELEASE_BASE_URL=https://example.com/downloads \
-MD_BROWSER_RELEASE_MANIFEST_COPY=/Users/liyanpeng/Downloads/MD-Browser-latest-mac-arm64.json \
+MD_BROWSER_RELEASE_MANIFEST_COPY=~/Downloads/MD-Browser-latest-mac-arm64.json \
 MD_BROWSER_RELEASE_NOTES='优化节点绑定|修复启动日志' \
 npm run release:manifest
 ```

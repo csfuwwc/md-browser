@@ -220,8 +220,8 @@ test("support bundle sanitizes secrets and summarizes routes", async () => {
     },
     embeddedMihomo: {
       ...defaultConfig.embeddedMihomo,
-      secret: "embedded-secret",
-      subscriptionUrl: "https://example.com/private-sub"
+      secret: "sample-embedded-token",
+      subscriptionUrl: "https://example.com/sample-sub"
     },
     routes: {
       test: {

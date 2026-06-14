@@ -67,7 +67,10 @@ async function routeStatus(config) {
     const proxyPort = parseProxyPort(route.proxyUrl);
     const cdpListening = await isTcpListening(route.cdpPort);
     const cdpVersion = cdpListening ? await fetchCdpVersion(route.cdpPort) : null;
-    const nodeName = readOptionalListenerProxy(mergePath, proxyPort);
+    const listenerProxy = readOptionalListenerProxy(mergePath, proxyPort);
+    const nodeName = config.proxyClient?.mode === "embedded"
+      ? (route.mihomoGroup || listenerProxy)
+      : listenerProxy;
     const nodeStatus = resolveNodeStatus(nodeName, nodeMap);
     const proxyListening = await isTcpListening(proxyPort);
     return [key, {
@@ -217,7 +220,7 @@ function embeddedRouteEntries(config) {
   return Object.entries(config.routes || {}).map(([key, route]) => ({
     key,
     ...route,
-    nodeName: readOptionalListenerProxy(mergePath, parseProxyPort(route.proxyUrl))
+    nodeName: route.mihomoGroup || readOptionalListenerProxy(mergePath, parseProxyPort(route.proxyUrl))
   }));
 }
 
@@ -344,7 +347,7 @@ export function compareVersions(left, right) {
   return 0;
 }
 
-export async function checkForUpdate({ currentVersion = appInfo().version, manifestUrl = process.env.MD_BROWSER_UPDATE_MANIFEST_URL || "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json", fetchImpl = fetch } = {}) {
+export async function checkForUpdate({ currentVersion = appInfo().version, manifestUrl = process.env.MD_BROWSER_UPDATE_MANIFEST_URL || "", fetchImpl = fetch } = {}) {
   if (!manifestUrl) return { configured: false, currentVersion, updateAvailable: false };
   const response = await fetchImpl(manifestUrl, { signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error(`更新清单读取失败: ${response.status}`);
@@ -635,8 +638,17 @@ async function handleApi(req, res) {
     if (!mergePath || !activeMihomoConfig(config)) {
       return sendJson(res, 400, { error: "未启动代理服务，无法绑定节点。" });
     }
-    if (config.proxyClient?.mode === "embedded" && !existsSync(mergePath)) {
-      writeEmbeddedMihomoConfig(config.embeddedMihomo, embeddedRouteEntries(config));
+    updateRoute(key, { mihomoGroup: body.node });
+    if (config.proxyClient?.mode === "embedded") {
+      const nextConfig = loadConfig();
+      const written = writeEmbeddedMihomoConfig(nextConfig.embeddedMihomo, embeddedRouteEntries(nextConfig));
+      const reload = await safeReloadConfig(activeMihomoConfig(nextConfig));
+      return sendJson(res, 200, {
+        route: key,
+        merge: { port: proxyPort, nodeName: body.node, changed: true, created: !existsSync(mergePath), path: written.configPath },
+        runtime: { skipped: true, reason: "embedded-config-regenerated" },
+        ...reload
+      });
     }
     const update = updateListenerProxyEverywhere({
       mergePath,

@@ -17,8 +17,8 @@ import {
 } from "../src/mihomo.js";
 
 test("buildHeaders includes Authorization when secret exists", () => {
-  assert.deepEqual(buildHeaders({ secret: "abc" }), {
-    Authorization: "Bearer abc",
+  assert.deepEqual(buildHeaders({ secret: "sample" }), {
+    Authorization: "Bearer sample",
     "content-type": "application/json"
   });
 });
@@ -84,7 +84,7 @@ test("listNodes explains Mihomo unauthorized responses", async () => {
 
   await assert.rejects(
     listNodes(
-      { controllerUrl: "http://127.0.0.1:9090", secret: "wrong" },
+      { controllerUrl: "http://127.0.0.1:9090", secret: "invalid-token" },
       { fetchImpl }
     ),
     /访问密钥/
@@ -99,7 +99,7 @@ test("testNodeDelay calls Mihomo delay endpoint for encoded node name", async ()
   };
 
   const result = await testNodeDelay(
-    { controllerUrl: "http://127.0.0.1:9090", secret: "abc" },
+    { controllerUrl: "http://127.0.0.1:9090", secret: "sample" },
     "[Anytls]台湾001",
     { fetchImpl, timeout: 3000 }
   );
@@ -108,7 +108,7 @@ test("testNodeDelay calls Mihomo delay endpoint for encoded node name", async ()
   assert.equal(result.delay, 238);
   assert.match(calls[0].url, /\/proxies\/%5BAnytls%5D%E5%8F%B0%E6%B9%BE001\/delay\?/);
   assert.match(calls[0].url, /timeout=3000/);
-  assert.equal(calls[0].options.headers.Authorization, "Bearer abc");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer sample");
 });
 
 test("updateListenerProxy updates proxy for matching listener port", () => {
@@ -173,14 +173,14 @@ test("deleteListenerByPort removes matching listener block", () => {
   try {
     writeFileSync(file, [
       "listeners:",
-      "  - name: shopee-us",
+      "  - name: market-us",
       "    type: mixed",
       "    listen: 127.0.0.1",
       "    port: 18101",
       "    proxy: old-us",
       "    udp: true",
       "",
-      "  - name: TikTok UK",
+      "  - name: Example Site UK",
       "    type: mixed",
       "    listen: 127.0.0.1",
       "    port: 18104",
@@ -198,8 +198,8 @@ test("deleteListenerByPort removes matching listener block", () => {
 
     assert.equal(result.changed, true);
     assert.equal(result.removed, true);
-    assert.match(updated, /name: shopee-us/);
-    assert.doesNotMatch(updated, /name: TikTok UK/);
+    assert.match(updated, /name: market-us/);
+    assert.doesNotMatch(updated, /name: Example Site UK/);
     assert.match(updated, /\ntun:\n  bypass:/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -253,16 +253,16 @@ test("updateListenerProxyEverywhere updates only merge config", () => {
       mergePath: mergeFile,
       port: 18104,
       nodeName: "[Anytls][偏远]英国",
-      listenerName: "TikTok UK"
+      listenerName: "Example Site UK"
     });
 
     assert.equal(result.merge.created, true);
     assert.equal(result.runtime.skipped, false);
     assert.equal(result.runtime.created, true);
     assert.equal(readListenerProxy(mergeFile, 18104), "[Anytls][偏远]英国");
-    assert.match(readFileSync(mergeFile, "utf8"), /name: "TikTok UK"/);
+    assert.match(readFileSync(mergeFile, "utf8"), /name: "Example Site UK"/);
     assert.equal(readListenerProxy(runtimeFile, 18104), "[Anytls][偏远]英国");
-    assert.match(readFileSync(runtimeFile, "utf8"), /name: "TikTok UK"/);
+    assert.match(readFileSync(runtimeFile, "utf8"), /name: "Example Site UK"/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

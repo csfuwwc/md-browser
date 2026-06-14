@@ -66,34 +66,34 @@ test("buildChromeArgs can open identity page before target site", () => {
     profileDir: "/Users/example/TK-US",
     proxyUrl: "http://127.0.0.1:18101",
     identityUrl: "http://127.0.0.1:18777/identity.html?route=tk-us",
-    startUrl: "https://www.tiktok.com/"
+    startUrl: "https://example.com/profile"
   });
 
   assert.equal(args.at(-2), "http://127.0.0.1:18777/identity.html?route=tk-us");
-  assert.equal(args.at(-1), "https://www.tiktok.com/");
+  assert.equal(args.at(-1), "https://example.com/profile");
 });
 
 test("normalizeTargetUrl accepts domains and empty values", () => {
-  assert.equal(normalizeTargetUrl("tiktok.com"), "https://tiktok.com/");
-  assert.equal(normalizeTargetUrl("https://www.tiktok.com/@modian"), "https://www.tiktok.com/@modian");
+  assert.equal(normalizeTargetUrl("example.com"), "https://example.com/");
+  assert.equal(normalizeTargetUrl("https://example.com/profileprofile"), "https://example.com/profileprofile");
   assert.equal(normalizeTargetUrl(""), "https://www.google.com/");
 });
 
 test("openUrlInCdp opens a new tab through Chrome debugging endpoint", async () => {
   const calls = [];
-  const result = await openUrlInCdp(9222, "tiktok.com", {
+  const result = await openUrlInCdp(9222, "example.com", {
     fetchImpl: async (url, options) => {
       calls.push({ url, options });
       return {
         ok: true,
         async json() {
-          return { id: "target-1", title: "TikTok", webSocketDebuggerUrl: "ws://127.0.0.1/page/1" };
+          return { id: "target-1", title: "Example Site", webSocketDebuggerUrl: "ws://127.0.0.1/page/1" };
         }
       };
     }
   });
 
-  assert.equal(calls[0].url, "http://127.0.0.1:9222/json/new?https%3A%2F%2Ftiktok.com%2F");
+  assert.equal(calls[0].url, "http://127.0.0.1:9222/json/new?https%3A%2F%2Fexample.com%2F");
   assert.equal(calls[0].options.method, "PUT");
   assert.equal(result.opened, true);
   assert.equal(result.targetId, "target-1");
@@ -125,13 +125,13 @@ test("launchRoute reports CDP port owner when the port is occupied by a non-CDP 
       inspectTcpPortImpl: async () => ({
         port: 9222,
         listening: true,
-        processes: [{ pid: 1234, command: "Google Chrome", user: "liyanpeng" }]
+        processes: [{ pid: 1234, command: "Google Chrome", user: "localuser" }]
       })
     }),
     (error) => {
       assert.equal(error.code, "CDP_PORT_CONFLICT");
       assert.equal(error.port, 9222);
-      assert.deepEqual(error.processes, [{ pid: 1234, command: "Google Chrome", user: "liyanpeng" }]);
+      assert.deepEqual(error.processes, [{ pid: 1234, command: "Google Chrome", user: "localuser" }]);
       assert.match(error.message, /端口 9222 已被占用/);
       return true;
     }
@@ -161,7 +161,7 @@ test("launchRoute refuses to reuse a CDP port owned by another Chrome identity",
         processes: [{
           pid: 1234,
           command: "Google Chrome",
-          user: "liyanpeng",
+          user: "localuser",
           fullCommand: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9222 --user-data-dir=/Users/example/Library/Application Support/Google/Chrome"
         }]
       })
@@ -220,16 +220,16 @@ test("fetchRouteWindowTitles returns page target titles from CDP", async () => {
       ok: true,
       async json() {
         return [
-          { type: "page", title: "TikTok - Make Your Day" },
+          { type: "page", title: "Example Site - Make Your Day" },
           { type: "other", title: "Ignored" },
-          { type: "page", title: "TikTok - Make Your Day" },
+          { type: "page", title: "Example Site - Make Your Day" },
           { type: "page", title: "  " }
         ];
       }
     };
   });
 
-  assert.deepEqual(titles, ["TikTok - Make Your Day"]);
+  assert.deepEqual(titles, ["Example Site - Make Your Day"]);
 });
 
 test("fetchRoutePageTargets returns page targets with debugger URLs", async () => {
@@ -237,14 +237,14 @@ test("fetchRoutePageTargets returns page targets with debugger URLs", async () =
     ok: true,
     async json() {
       return [
-        { type: "page", title: "TikTok", webSocketDebuggerUrl: "ws://127.0.0.1/devtools/page/1" },
+        { type: "page", title: "Example Site", webSocketDebuggerUrl: "ws://127.0.0.1/devtools/page/1" },
         { type: "browser", title: "Browser", webSocketDebuggerUrl: "ws://127.0.0.1/devtools/browser/1" }
       ];
     }
   }));
 
   assert.deepEqual(targets, [
-    { type: "page", title: "TikTok", webSocketDebuggerUrl: "ws://127.0.0.1/devtools/page/1" }
+    { type: "page", title: "Example Site", webSocketDebuggerUrl: "ws://127.0.0.1/devtools/page/1" }
   ]);
 });
 
@@ -308,10 +308,10 @@ test("closeCdpBrowser sends Browser.close to browser websocket", async () => {
 });
 
 test("buildForegroundChromeWindowScript matches Chrome window titles", () => {
-  const script = buildForegroundChromeWindowScript(['TikTok "US"']);
+  const script = buildForegroundChromeWindowScript(['Example Site "US"']);
   assert.match(script, /tell application "Google Chrome"/);
   assert.match(script, /set active tab index of chromeWindow/);
-  assert.match(script, /TikTok \\"US\\"/);
+  assert.match(script, /Example Site \\"US\\"/);
 });
 
 test("listProfiles returns profile directories sorted by name", () => {
