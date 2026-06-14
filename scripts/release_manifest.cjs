@@ -51,8 +51,10 @@ function writeReleaseManifest(manifest, outputPath) {
 }
 
 function main() {
+  const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  const productName = packageJson.build?.productName || "MD-Browser";
   const artifactPath = process.env.MD_BROWSER_RELEASE_ARTIFACT
-    || join("dist", "MD-Browser-0.1.0-arm64.dmg");
+    || join("dist", `${productName}-${packageJson.version}-arm64.dmg`);
   const outputPath = process.env.MD_BROWSER_RELEASE_MANIFEST
     || join("dist", "latest-mac-arm64.json");
   const downloadsCopy = process.env.MD_BROWSER_RELEASE_MANIFEST_COPY || "";

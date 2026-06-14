@@ -4,17 +4,17 @@
 
 ## 你会收到什么
 
-- 安装包：`MD-Browser-0.1.0-arm64.dmg`
+- 安装包：`MD-Browser-0.2.0-arm64.dmg`
 - 版本清单：`MD-Browser-latest-mac-arm64.json`，负责人用于核对版本和文件校验，普通成员通常不需要打开
 - 适用设备：Apple Silicon / M 系列 Mac
-- 当前版本：`0.1.0`
-- 文件校验：`774b202e63d39584a734d6f2ef1436f7872e867df7b9555788d80013ddde9c82`
+- 当前版本：`0.2.0`
+- 文件校验：983b9f9e7c0c27b56ea4dfadf6834b6a7cfa206859987048a11dbcc360e38acd
 
 当前是未签名内测包，只适合内部验证。正式分发版本会做 Apple 签名和公证。
 
 ## 安装
 
-1. 双击打开 `MD-Browser-0.1.0-arm64.dmg`。
+1. 双击打开 `MD-Browser-0.2.0-arm64.dmg`。
 2. 把 `MD-Browser.app` 拖到 `Applications`。
 3. 打开 `Applications` 里的 `MD-Browser`。
 

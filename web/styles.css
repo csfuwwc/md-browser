@@ -2539,10 +2539,34 @@ dialog::backdrop {
 }
 
 .guide-steps strong {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   color: #0f172a;
   font-size: 14px;
   margin-bottom: 5px;
+}
+
+.guide-step-state {
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+  color: #64748b;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 7px;
+}
+
+.guide-step-state[data-state="done"] {
+  background: rgba(220, 252, 231, 0.9);
+  color: #15803d;
+}
+
+.guide-step-state[data-state="todo"] {
+  background: rgba(254, 243, 199, 0.85);
+  color: #b45309;
 }
 
 .guide-steps p {

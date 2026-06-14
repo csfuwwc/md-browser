@@ -1,6 +1,6 @@
 {
   "name": "md-browser",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local browser profile and proxy route manager for cross-border workflows.",
   "author": "Modian AI",
   "private": true,

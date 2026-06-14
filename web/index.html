@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MD-Browser</title>
-    <link rel="stylesheet" href="/styles.css?v=92">
+    <link rel="stylesheet" href="/styles.css?v=93">
   </head>
   <body>
     <main class="shell">
@@ -645,42 +645,42 @@
           </button>
         </div>
         <div class="guide-steps">
-          <article>
+          <article data-guide-step="proxy">
             <span>01</span>
             <div>
-              <strong>准备代理服务</strong>
+              <strong>准备代理服务 <em class="guide-step-state">待检查</em></strong>
               <p>默认使用外部代理客户端。首次使用先到系统设置选择 Clash Verge Rev，或改用内置 Mihomo 并填写订阅地址。</p>
             </div>
             <button class="guide-step-action page-jump-button" type="button" data-target-page="settings" data-target-action="proxy-settings">去设置</button>
           </article>
-          <article>
+          <article data-guide-step="storage">
             <span>02</span>
             <div>
-              <strong>确认目录池</strong>
+              <strong>确认目录池 <em class="guide-step-state">待检查</em></strong>
               <p>首次打开会自动导入本机 Chrome 和已发现的独立身份目录，后续也可以手动导入。</p>
             </div>
             <button class="guide-step-action page-jump-button" type="button" data-target-page="storage">去查看</button>
           </article>
-          <article>
+          <article data-guide-step="routes">
             <span>03</span>
             <div>
-              <strong>创建浏览器配置</strong>
+              <strong>创建浏览器配置 <em class="guide-step-state">待检查</em></strong>
               <p>填写配置名称，确认 CDP 端口，绑定可用节点；高级项可选择身份目录和代理入口端口。</p>
             </div>
             <button class="guide-step-action page-jump-button" type="button" data-target-page="routes">去创建</button>
           </article>
-          <article>
+          <article data-guide-step="launch">
             <span>04</span>
             <div>
-              <strong>启动并验证</strong>
+              <strong>启动并验证 <em class="guide-step-state">待检查</em></strong>
               <p>点击浏览器配置里的启动按钮，确认浏览器打开、代理在线、目标网站可以访问。</p>
             </div>
             <button class="guide-step-action page-jump-button" type="button" data-target-page="routes">去启动</button>
           </article>
-          <article>
+          <article data-guide-step="agent">
             <span>05</span>
             <div>
-              <strong>交给 Agent 使用</strong>
+              <strong>交给 Agent 使用 <em class="guide-step-state">待检查</em></strong>
               <p>Codex 可通过 MD-Browser MCP 读取配置，并按指定配置打开网站或连接已有浏览器。</p>
             </div>
             <button class="guide-step-action page-jump-button" type="button" data-target-page="settings" data-target-action="agent-settings">去设置</button>
@@ -819,6 +819,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="/app.js?v=110"></script>
+    <script type="module" src="/app.js?v=111"></script>
   </body>
 </html>

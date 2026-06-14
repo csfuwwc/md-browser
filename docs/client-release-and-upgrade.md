@@ -15,13 +15,13 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 ## 当前内测构建
 
-- 版本：`0.1.0`
+- 版本：`0.2.0`
 - 架构：Apple Silicon / arm64，适用于 M 系列 Mac
-- 本地安装包：`/Users/liyanpeng/Downloads/MD-Browser-0.1.0-arm64.dmg`
+- 本地安装包：`/Users/liyanpeng/Downloads/MD-Browser-0.2.0-arm64.dmg`
 - SHA-256：`774b202e63d39584a734d6f2ef1436f7872e867df7b9555788d80013ddde9c82`
 - 构建时间：`2026-06-12 15:36 CST`
 - 签名状态：未签名、未公证，仅适合本机或内部临时验证
-- 已验证：DMG 校验通过；从 DMG 挂载后复制出的 `MD-Browser.app` 可启动；本地 `/api/status` 返回 `MD-Browser v0.1.0`
+- 已验证：测试通过；打包后需验证 DMG 校验和本地 `/api/status` 版本。
 - 正式签名前置检查：`2026-06-12 15:00 CST` 已执行，当前缺少 `Developer ID Application` 证书和 Apple 公证凭据
 
 这个构建包含内置 Mihomo 的“一键安装并启用”、填写订阅后自动保存设置并切换为内置后端、优先选择普通 `darwin-arm64` Mihomo 二进制、旧配置迁移前备份、设置页诊断信息卡片、节点页代理后端状态、设置页版本显示、团队配置导入导出、发布清单生成等当前内测功能。
@@ -34,7 +34,7 @@ MD-Browser 客户端最终面向团队成员分发。客户端只负责承载本
 
 安装步骤：
 
-1. 打开 `/Users/liyanpeng/Downloads/MD-Browser-0.1.0-arm64.dmg`。
+1. 打开 `/Users/liyanpeng/Downloads/MD-Browser-0.2.0-arm64.dmg`。
 2. 把 `MD-Browser.app` 拖到 `/Applications`。
 3. 如果 macOS 提示无法打开，先用访达右键 `MD-Browser.app` 选择“打开”。
 4. 如果仍被 Gatekeeper 拦截，内测阶段可以执行：
@@ -114,7 +114,7 @@ MD_BROWSER_RELEASE_NOTES='优化节点绑定|修复启动日志' \
 npm run release:manifest
 ```
 
-默认会读取 `dist/MD-Browser-0.1.0-arm64.dmg`，生成：
+默认会读取 `dist/MD-Browser-0.2.0-arm64.dmg`，生成：
 
 ```text
 dist/latest-mac-arm64.json

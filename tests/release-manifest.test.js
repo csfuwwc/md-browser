@@ -6,7 +6,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { buildReleaseManifest, normalizeBaseUrl, writeReleaseManifest } = require("../scripts/release_manifest.cjs");
+const { buildReleaseManifest, normalizeBaseUrl, sha256, writeReleaseManifest } = require("../scripts/release_manifest.cjs");
 
 test("normalizeBaseUrl removes trailing slashes", () => {
   assert.equal(normalizeBaseUrl("https://downloads.example.com/md///"), "https://downloads.example.com/md");
@@ -43,6 +43,17 @@ test("buildReleaseManifest writes version, download URL, SHA and size", () => {
     assert.equal(saved.sha256, "a93b94ffef56a7c5cd60bba382e95a01fec5e0a580b9a1d3f7e78f8a54b8432f");
     assert.equal(saved.size, 8);
     assert.deepEqual(saved.notes, ["诊断信息", "内置 Mihomo"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("sha256 returns stable artifact checksum", () => {
+  const dir = mkdtempSync(join(tmpdir(), "md-browser-release-sha-"));
+  try {
+    const artifactPath = join(dir, "artifact.dmg");
+    writeFileSync(artifactPath, "fake-dmg");
+    assert.equal(sha256(artifactPath), "a93b94ffef56a7c5cd60bba382e95a01fec5e0a580b9a1d3f7e78f8a54b8432f");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

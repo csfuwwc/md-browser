@@ -12,20 +12,20 @@ npm run package:mac
 MD_BROWSER_RELEASE_MANIFEST_COPY=/Users/liyanpeng/Downloads/MD-Browser-latest-mac-arm64.json npm run release:manifest
 ```
 
-`release:manifest` 会读取 `dist/MD-Browser-0.1.0-arm64.dmg`，生成 `dist/latest-mac-arm64.json`。这份 JSON 用于后续客户端启动时检查是否有新版，也方便负责人核对下载包的 SHA-256。
+`release:manifest` 会读取 `dist/MD-Browser-0.2.0-arm64.dmg`，生成 `dist/latest-mac-arm64.json`。这份 JSON 用于后续客户端启动时检查是否有新版，也方便负责人核对下载包的 SHA-256。
 
 ### 使用 Mac 客户端内测包
 
 当前内测安装包已经生成到：
 
 ```text
-/Users/liyanpeng/Downloads/MD-Browser-0.1.0-arm64.dmg
+/Users/liyanpeng/Downloads/MD-Browser-0.2.0-arm64.dmg
 ```
 
 SHA-256：
 
 ```text
-774b202e63d39584a734d6f2ef1436f7872e867df7b9555788d80013ddde9c82
+983b9f9e7c0c27b56ea4dfadf6834b6a7cfa206859987048a11dbcc360e38acd
 ```
 
 打开 `.dmg` 后把 `MD-Browser.app` 拖到 `/Applications`。当前包未签名、未公证，如果 macOS 提示无法打开，内测阶段可以用下面两种方式之一处理：

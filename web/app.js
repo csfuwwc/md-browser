@@ -243,6 +243,28 @@ function renderDashboardActivityPreview() {
   `).join("");
 }
 
+function renderGuideReadiness({ routes = currentRoutes, config = currentConfig, roots = userDataRoots, nodes = mihomoNodes } = {}) {
+  const routeValues = Object.values(routes || {});
+  const proxyReady = currentProxyMode(config) !== "none" && (Array.isArray(nodes) ? nodes.length > 0 : false);
+  const storageReady = Array.isArray(roots) && roots.length > 0;
+  const routesReady = routeValues.length > 0;
+  const launchReady = routeValues.some((route) => route.cdpReady ?? Boolean(route.cdpVersion));
+  const agentReady = config?.agent?.mcpEnabled !== false;
+  const states = {
+    proxy: proxyReady,
+    storage: storageReady,
+    routes: routesReady,
+    launch: launchReady,
+    agent: agentReady
+  };
+  Object.entries(states).forEach(([key, done]) => {
+    const node = document.querySelector(`[data-guide-step="${key}"] .guide-step-state`);
+    if (!node) return;
+    node.dataset.state = done ? "done" : "todo";
+    node.textContent = done ? "已完成" : "待处理";
+  });
+}
+
 function setCurrentPage(page) {
   const nextPage = PAGE_META[page] ? page : "dashboard";
   currentPage = nextPage;
@@ -1533,6 +1555,7 @@ async function refresh(options = {}) {
     renderDashboardAlerts(data.routes);
     renderRoutes(data.routes);
     renderDashboardActivityPreview();
+    renderGuideReadiness({ routes: data.routes, config: data.config, roots: userDataRoots, nodes: mihomoNodes });
     return data;
   } catch (error) {
     updateServiceState("offline", error.message, { logTransition: logServiceTransition });
