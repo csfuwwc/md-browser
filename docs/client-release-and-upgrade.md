@@ -200,6 +200,8 @@ dist/latest-mac-arm64.json
 
 ## 推荐版本节奏
 
+- 具体版本拆分见项目根目录的 [Roadmap](../ROADMAP.md)
+- 更新记录见项目根目录的 [Changelog](../CHANGELOG.md)
 - `0.x`：内部测试，允许快速迭代 UI 和字段
 - `1.0`：配置结构稳定，团队可正式使用
 - `1.x`：只做兼容升级，不破坏旧配置

@@ -1,0 +1,25 @@
+# Changelog
+
+## v0.1.0 - 2026-06-14
+
+### Added
+
+- 本地 WebUI / Mac 客户端雏形：管理浏览器配置、目录池、节点池、系统设置和运行日志。
+- 浏览器配置中心：支持配置名称、CDP 端口、代理入口端口、User Data Dir、Chrome Profile、默认启动网址和绑定节点。
+- 代理服务：支持外部 Clash Verge Rev / Mihomo-compatible 客户端，也支持内置 Mihomo 的订阅、安装、启动和一键修复。
+- Agent 通道：提供 HTTP MCP 地址 `/mcp`，Codex 等 Agent 可以读取浏览器配置、启动配置、打开网址和测速节点。
+- 团队共享：支持浏览器配置 JSON 导入导出，导出内容不包含本机登录态、Cookie、User Data Dir 和密钥。
+- Mac 打包：支持 arm64 DMG/ZIP 构建，已有签名和公证预检脚本。
+- 发布清单：支持生成包含版本、下载地址、文件大小和 SHA-256 的 release manifest。
+
+### Changed
+
+- 产品名统一为 MD-Browser。
+- 默认浏览器资料目录改为 MD-Browser 独立身份目录。
+- 仪表盘聚焦快捷入口、需要处理项和使用指南。
+
+### Fixed
+
+- 禁止使用系统默认 Chrome 资料目录作为托管浏览器身份。
+- 启动、关闭和定位窗口前会校验 CDP 端口归属，避免接管或误操作默认 Chrome。
+- 端口冲突时不自动杀进程、不自动改端口。

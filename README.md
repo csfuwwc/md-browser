@@ -42,6 +42,11 @@ open /Applications/MD-Browser.app
 
 给团队成员分发时，可以直接附上 [团队内测安装与首次配置指南](docs/team-install-guide.md)。
 
+版本规划和更新记录：
+
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+
 ### 使用本地 WebUI 调试
 
 ```bash
