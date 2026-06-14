@@ -22,8 +22,8 @@
       "dmg"
     ],
     "resources": [
-      "../.tauri-bundle/runtime/node",
-      "../.tauri-bundle/app"
+      "../tauri-bundle/runtime/node",
+      "../tauri-bundle/app"
     ],
     "icon": [
       "../build/icon.icns"

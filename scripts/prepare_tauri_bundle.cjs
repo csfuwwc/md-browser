@@ -2,7 +2,7 @@ const { cpSync, chmodSync, existsSync, mkdirSync, rmSync } = require("node:fs");
 const { dirname, join } = require("node:path");
 
 const rootDir = process.cwd();
-const bundleRoot = join(rootDir, ".tauri-bundle");
+const bundleRoot = join(rootDir, "tauri-bundle");
 const runtimeDir = join(bundleRoot, "runtime");
 const appDir = join(bundleRoot, "app");
 const nodeBinary = process.execPath;

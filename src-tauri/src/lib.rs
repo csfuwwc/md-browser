@@ -29,12 +29,12 @@ fn bundled_resource_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn bundled_resource_root(app: &AppHandle) -> Result<PathBuf, String> {
     let resource_dir = bundled_resource_dir(app)?;
-    let direct_root = resource_dir.join(".tauri-bundle");
+    let direct_root = resource_dir.join("tauri-bundle");
     if direct_root.exists() {
         return Ok(direct_root);
     }
 
-    let tauri_up_root = resource_dir.join("_up_/.tauri-bundle");
+    let tauri_up_root = resource_dir.join("_up_/tauri-bundle");
     if tauri_up_root.exists() {
         return Ok(tauri_up_root);
     }
