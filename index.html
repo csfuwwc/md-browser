@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MD-Browser</title>
+    <link rel="stylesheet" href="/styles.css?v=67">
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="rail" aria-label="router summary">
+        <div class="brand-mark" aria-label="MD-Browser">
+          <img src="/assets/md-browser-logo.png" alt="">
+        </div>
+        <nav class="rail-nav" aria-label="primary navigation">
+          <a class="active" href="#dashboard" aria-label="仪表盘" data-tooltip="仪表盘">
+            <span class="rail-glyph rail-icon-dashboard" aria-hidden="true"></span>
+          </a>
+          <a href="#routes" aria-label="浏览器配置" data-tooltip="浏览器配置">
+            <span class="rail-glyph rail-icon-browser" aria-hidden="true"></span>
+          </a>
+          <a href="#storage" aria-label="目录池" data-tooltip="目录池">
+            <span class="rail-glyph rail-icon-identity" aria-hidden="true"></span>
+          </a>
+          <a href="#nodes" aria-label="节点" data-tooltip="节点">
+            <span class="rail-glyph rail-icon-vpn" aria-hidden="true"></span>
+          </a>
+          <a href="#settings" aria-label="设置" data-tooltip="设置">
+            <span class="rail-glyph rail-icon-gear" aria-hidden="true"></span>
+          </a>
+          <a href="#activity" class="rail-nav-button" aria-label="运行日志" data-tooltip="运行日志">
+            <span class="rail-glyph rail-icon-activity" aria-hidden="true"></span>
+          </a>
+        </nav>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p id="topbar-eyebrow" class="eyebrow">Local Browser Router</p>
+            <h2 id="topbar-title">仪表盘</h2>
+          </div>
+        </header>
+
+        <section id="dashboard" class="workspace-page active" data-page="dashboard">
+          <section class="dashboard-metrics dashboard-metrics-strip" aria-label="运行指标">
+            <article class="dashboard-metric-card" data-accent="browser">
+              <span>浏览器配置</span>
+              <strong id="dashboard-route-count">0</strong>
+              <small id="dashboard-route-detail">0 个可用</small>
+            </article>
+            <article class="dashboard-metric-card" data-accent="online">
+              <span>浏览器在线</span>
+              <strong id="dashboard-browser-count">0</strong>
+              <small>CDP 端口已监听</small>
+            </article>
+            <article class="dashboard-metric-card" data-accent="proxy">
+              <span>代理在线</span>
+              <strong id="dashboard-proxy-count">0</strong>
+              <small>代理入口已监听</small>
+            </article>
+            <article class="dashboard-metric-card" data-accent="alert">
+              <span>异常提醒</span>
+              <strong id="dashboard-alert-count">0</strong>
+              <small id="dashboard-alert-detail">当前没有待处理项</small>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <section class="panel dashboard-shortcuts-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Jump To</p>
+                  <h3>模块入口</h3>
+                </div>
+                <button id="open-guide-inline" class="guide-inline-button" type="button">
+                  <span class="guide-inline-icon" aria-hidden="true"></span>
+                  <span>如何使用？</span>
+                </button>
+              </div>
+              <div class="dashboard-shortcuts">
+                <button class="dashboard-shortcut" type="button" data-target-page="routes">
+                  <span class="dashboard-shortcut-icon">
+                    <span class="rail-glyph rail-icon-browser" aria-hidden="true"></span>
+                  </span>
+                  <span class="dashboard-shortcut-copy">
+                    <strong>浏览器配置</strong>
+                    <span>查看启动状态与节点绑定</span>
+                  </span>
+                  <span class="dashboard-shortcut-arrow" aria-hidden="true">→</span>
+                </button>
+                <button class="dashboard-shortcut" type="button" data-target-page="storage">
+                  <span class="dashboard-shortcut-icon">
+                    <span class="rail-glyph rail-icon-identity" aria-hidden="true"></span>
+                  </span>
+                  <span class="dashboard-shortcut-copy">
+                    <strong>目录池</strong>
+                    <span>管理浏览器身份来源</span>
+                  </span>
+                  <span class="dashboard-shortcut-arrow" aria-hidden="true">→</span>
+                </button>
+                <button class="dashboard-shortcut" type="button" data-target-page="nodes">
+                  <span class="dashboard-shortcut-icon">
+                    <span class="rail-glyph rail-icon-vpn" aria-hidden="true"></span>
+                  </span>
+                  <span class="dashboard-shortcut-copy">
+                    <strong>节点池</strong>
+                    <span>查看可绑定节点与可用性</span>
+                  </span>
+                  <span class="dashboard-shortcut-arrow" aria-hidden="true">→</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="panel dashboard-events-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Attention</p>
+                  <h3>需要处理</h3>
+                </div>
+              </div>
+              <div id="dashboard-alerts" class="dashboard-alert-list">
+              </div>
+            </section>
+          </section>
+          <button id="open-guide-dialog" class="dashboard-guide-button" type="button" aria-label="使用指南" data-tooltip="使用指南">
+            <span class="guide-button-icon" aria-hidden="true"></span>
+          </button>
+        </section>
+
+        <section id="routes-page" class="workspace-page" data-page="routes">
+          <section class="route-panel">
+            <div class="route-toolbar">
+              <div>
+                <p class="eyebrow">Browser Configs</p>
+                <h3>浏览器配置</h3>
+              </div>
+              <div class="route-toolbar-actions">
+                <label class="toolbar-search">
+                  <span class="visually-hidden">搜索配置</span>
+                  <input id="route-search" type="search" placeholder="搜索名称、标签、节点、站点">
+                </label>
+                <label class="toolbar-filter">
+                  <span class="visually-hidden">状态筛选</span>
+                  <select id="route-state-filter">
+                    <option value="all">全部状态</option>
+                    <option value="ready">可用</option>
+                    <option value="unavailable">不可用</option>
+                    <option value="browser-running">浏览器运行中</option>
+                    <option value="browser-stopped">浏览器未启动</option>
+                    <option value="proxy-offline">代理离线</option>
+                    <option value="node-issue">节点异常</option>
+                  </select>
+                </label>
+                <div class="view-toggle" role="group" aria-label="浏览器配置展示模式">
+                  <button id="route-view-list" class="view-toggle-button active" type="button" aria-label="列表展示" data-tooltip="列表展示">
+                    <span class="view-toggle-icon view-toggle-icon-list" aria-hidden="true"></span>
+                  </button>
+                  <button id="route-view-card" class="view-toggle-button" type="button" aria-label="卡牌展示" data-tooltip="卡牌展示">
+                    <span class="view-toggle-icon view-toggle-icon-grid" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <button id="export-template" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="导出配置" data-tooltip="导出配置">
+                  <span class="action-icon action-icon-upload" aria-hidden="true"></span>
+                </button>
+                <button id="import-template" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="导入配置" data-tooltip="导入配置">
+                  <span class="action-icon action-icon-download" aria-hidden="true"></span>
+                </button>
+                <button id="create-route" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="添加配置" data-tooltip="添加配置">
+                  <span class="topbar-action-icon topbar-action-icon-plus" aria-hidden="true"></span>
+                </button>
+              </div>
+            </div>
+            <section id="routes" class="route-list" aria-label="browser environments"></section>
+          </section>
+        </section>
+
+        <section id="storage" class="workspace-page" data-page="storage">
+          <section class="panel user-data-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Storage Pools</p>
+                <h3>目录池</h3>
+              </div>
+              <span class="panel-note">统一维护可切换的 user-data-dir 目录来源</span>
+            </div>
+            <div class="storage-summary">
+              <div class="storage-summary-copy">
+                <strong id="user-data-root-count">0 个目录池</strong>
+                <span>支持导入默认 Chrome、独立目录池或自定义路径。</span>
+              </div>
+              <div class="storage-actions">
+                <button id="rescan-root-dirs" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="重新扫描目录池" data-tooltip="重新扫描">
+                  <span class="action-icon action-icon-refresh" aria-hidden="true"></span>
+                </button>
+                <button id="open-root-dialog" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="导入目录池" data-tooltip="导入目录池">
+                  <span class="action-icon action-icon-folder-plus" aria-hidden="true"></span>
+                </button>
+              </div>
+            </div>
+            <div id="user-data-roots" class="root-list"></div>
+          </section>
+        </section>
+
+        <section id="nodes" class="workspace-page" data-page="nodes">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Proxy nodes</p>
+                <h3>代理节点池</h3>
+              </div>
+              <span class="panel-note">展示当前代理来源、节点健康和可绑定节点</span>
+            </div>
+            <div id="node-backend-summary" class="node-backend-summary">
+              <article>
+                <span>当前后端</span>
+                <strong id="node-backend-mode">检测中</strong>
+                <small id="node-backend-detail">正在读取代理服务配置</small>
+              </article>
+              <article>
+                <span>连接状态</span>
+                <strong id="node-backend-state" data-state="checking">检测中</strong>
+                <small id="node-backend-health">等待节点池返回</small>
+              </article>
+              <article>
+                <span>内置 Core</span>
+                <strong id="node-embedded-core-state" data-state="checking">检测中</strong>
+                <small id="node-embedded-core-detail">仅内置模式需要关注</small>
+              </article>
+            </div>
+            <div id="mihomo-nodes" class="mihomo-groups">正在检测当前代理后端...</div>
+          </section>
+        </section>
+
+        <section id="settings" class="workspace-page" data-page="settings">
+          <section class="panel settings-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Settings</p>
+                <h3>系统设置</h3>
+              </div>
+              <span class="panel-note">本机连接、配置存储和 Agent 通道</span>
+            </div>
+            <div class="settings-grid">
+              <article class="settings-card">
+                <span class="settings-card-icon">
+                  <span class="rail-glyph rail-icon-dashboard" aria-hidden="true"></span>
+                </span>
+                <div class="settings-card-copy">
+                  <span>本地服务</span>
+                  <strong id="settings-service-state">检测中</strong>
+                  <small id="settings-service-url">http://127.0.0.1:18777</small>
+                </div>
+              </article>
+              <article class="settings-card">
+                <span class="settings-card-icon">
+                  <span class="rail-glyph rail-icon-vpn" aria-hidden="true"></span>
+                </span>
+                <div class="settings-card-copy">
+                  <span>代理服务</span>
+                  <strong id="settings-mihomo-state">检测中</strong>
+                  <small><span id="settings-node-count">0</span> 个可绑定节点</small>
+                </div>
+              </article>
+              <article class="settings-card">
+                <span class="settings-card-icon">
+                  <span class="rail-glyph rail-icon-identity" aria-hidden="true"></span>
+                </span>
+                <div class="settings-card-copy">
+                  <span>配置存储</span>
+                  <strong id="settings-config-location">~/.md-browser/config.json</strong>
+                  <small><span id="settings-root-count">0</span> 个目录池</small>
+                </div>
+              </article>
+              <article class="settings-card">
+                <span class="settings-card-icon">
+                  <span class="rail-glyph rail-icon-browser" aria-hidden="true"></span>
+                </span>
+                <div class="settings-card-copy">
+                  <span>Agent 通道</span>
+                  <strong id="settings-agent-state">检测中</strong>
+                  <small><span id="settings-route-count">0 个浏览器配置</span> 可供 Codex 读取</small>
+                </div>
+              </article>
+            </div>
+            <form id="settings-form" class="settings-form">
+              <div class="settings-form-section">
+                <div class="settings-form-heading">
+                  <strong>代理服务设置</strong>
+                  <span>用于读取节点、写入 listener，并把浏览器配置绑定到具体节点。</span>
+                </div>
+                <div class="proxy-mode-options" role="radiogroup" aria-label="代理客户端模式">
+                  <label class="proxy-mode-card">
+                    <input id="proxy-mode-external" type="radio" name="proxy-client-mode" value="external">
+                    <span>
+                      <strong>外部代理客户端</strong>
+                      <small>连接本机已安装的 Clash Verge / Mihomo-compatible 客户端。</small>
+                    </span>
+                  </label>
+                  <label class="proxy-mode-card">
+                    <input id="proxy-mode-embedded" type="radio" name="proxy-client-mode" value="embedded">
+                    <span>
+                      <strong>内置 Mihomo</strong>
+                      <small>由 MD-Browser 管理 Mihomo Core、订阅和本机代理入口。</small>
+                    </span>
+                  </label>
+                </div>
+                <div id="external-proxy-summary" class="proxy-client-summary">
+                  <div>
+                    <span>外部代理客户端</span>
+                    <strong id="settings-proxy-client-state">检测中</strong>
+                    <small id="settings-proxy-client-detail">优先自动检测本机 Clash Verge / Mihomo-compatible 客户端。</small>
+                  </div>
+                  <div class="proxy-client-actions">
+                    <button id="choose-proxy-client" class="button ghost" type="button">选择客户端</button>
+                    <button id="detect-proxy-client" class="button ghost" type="button">刷新状态</button>
+                    <button id="toggle-proxy-advanced" class="button ghost" type="button" aria-expanded="false">高级设置</button>
+                  </div>
+                </div>
+                <div id="embedded-proxy-summary" class="proxy-client-summary" hidden>
+                  <div>
+                    <span>内置 Mihomo</span>
+                    <strong id="settings-embedded-state">检测中</strong>
+                    <small id="settings-embedded-detail">首次使用需要安装 Core，并填写订阅地址。</small>
+                    <small id="settings-embedded-next-step" class="proxy-next-step">按顺序完成安装、订阅、生成配置和启动。</small>
+                    <label class="embedded-subscription-field">
+                      <span>订阅地址</span>
+                      <input id="settings-embedded-subscription-url" type="text" placeholder="粘贴你的代理订阅 URL">
+                    </label>
+                  </div>
+                  <div class="proxy-client-actions">
+                    <button id="enable-embedded-mihomo" class="button primary" type="button">安装并启用</button>
+                    <button id="install-embedded-mihomo" class="button ghost" type="button">仅安装 Core</button>
+                    <button id="write-embedded-config" class="button ghost" type="button">生成配置</button>
+                    <button id="start-embedded-mihomo" class="button ghost" type="button">启动</button>
+                    <button id="stop-embedded-mihomo" class="button ghost" type="button">停止</button>
+                    <button id="toggle-embedded-advanced" class="button ghost" type="button" aria-expanded="false">高级设置</button>
+                  </div>
+                </div>
+                <div id="proxy-advanced-settings" class="proxy-advanced-settings" hidden>
+                  <label class="settings-field">
+                    <span>控制地址</span>
+                    <input id="settings-mihomo-controller" type="text" placeholder="http://127.0.0.1:9090">
+                  </label>
+                  <label class="settings-field">
+                    <span>访问密钥</span>
+                    <input id="settings-mihomo-secret" type="password" placeholder="未设置则留空">
+                  </label>
+                  <label class="settings-field wide">
+                    <span>Merge 配置路径</span>
+                    <input id="settings-mihomo-merge-path" type="text" placeholder="~/Library/Application Support/.../Merge.yaml">
+                  </label>
+                  <label class="settings-field wide">
+                    <span>运行配置路径</span>
+                    <input id="settings-mihomo-runtime-path" type="text" placeholder="可选，留空自动推断 clash-verge.yaml">
+                  </label>
+                </div>
+                <div id="embedded-advanced-settings" class="proxy-advanced-settings" hidden>
+                  <label class="settings-toggle-field wide">
+                    <span>
+                      <strong>随应用启动</strong>
+                      <small>打开 MD-Browser 时自动启动内置 Mihomo。</small>
+                    </span>
+                    <input id="settings-embedded-auto-start" type="checkbox" role="switch">
+                  </label>
+                  <label class="settings-field">
+                    <span>控制地址</span>
+                    <input id="settings-embedded-controller" type="text" placeholder="http://127.0.0.1:19090">
+                  </label>
+                  <label class="settings-field">
+                    <span>访问密钥</span>
+                    <input id="settings-embedded-secret" type="password" placeholder="未设置则留空">
+                  </label>
+                  <label class="settings-field wide">
+                    <span>Core 路径</span>
+                    <input id="settings-embedded-binary-path" type="text" placeholder="~/Library/Application Support/MD-Browser/bin/mihomo">
+                  </label>
+                  <label class="settings-field wide">
+                    <span>配置路径</span>
+                    <input id="settings-embedded-config-path" type="text" placeholder="~/Library/Application Support/MD-Browser/mihomo/config.yaml">
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-form-section">
+                <div class="settings-form-heading">
+                  <strong>本地浏览器设置</strong>
+                  <span>选择支持 CDP 的 Chromium 浏览器；端口和默认目录放在高级设置里。</span>
+                </div>
+                <div class="local-browser-summary">
+                  <div>
+                    <span>当前浏览器</span>
+                    <strong id="settings-browser-summary">Google Chrome</strong>
+                    <small id="settings-browser-detail">用于启动 CDP 调试端口和独立身份。</small>
+                  </div>
+                  <div class="local-browser-actions">
+                    <button id="choose-browser" class="button ghost" type="button">选择浏览器</button>
+                    <button id="toggle-local-advanced" class="button ghost" type="button" aria-expanded="false">高级设置</button>
+                  </div>
+                </div>
+                <div id="local-advanced-settings" class="local-advanced-settings" hidden>
+                  <label class="settings-field">
+                    <span>浏览器应用名称</span>
+                    <input id="settings-chrome-app-name" type="text" placeholder="Google Chrome">
+                  </label>
+                  <label class="settings-field">
+                    <span>页面服务端口</span>
+                    <input id="settings-server-port" type="number" min="1" max="65535" placeholder="18777">
+                  </label>
+                  <label class="settings-field wide">
+                    <span>默认独立身份目录</span>
+                    <input id="settings-profile-root" type="text" placeholder="~/Library/Application Support/MD-Browser/Profiles">
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-form-section">
+                <div class="settings-form-heading">
+                  <strong>Agent 通道设置</strong>
+                  <span>开启后，Codex 等工具可以通过 MCP 读取配置、启动浏览器并打开指定网址。</span>
+                </div>
+                <label class="settings-toggle-field wide">
+                  <span>
+                    <strong>MCP 服务</strong>
+                    <small>关闭后，MCP 工具和 Agent API 会拒绝外部调用。</small>
+                  </span>
+                  <input id="settings-agent-mcp-enabled" type="checkbox" role="switch">
+                </label>
+              </div>
+
+              <div class="settings-form-actions">
+                <span id="settings-save-hint" class="settings-save-hint"></span>
+                <button id="settings-save" class="button primary" type="submit">保存设置</button>
+              </div>
+            </form>
+          </section>
+        </section>
+
+        <section id="activity" class="workspace-page" data-page="activity">
+          <section class="panel activity-page-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Activity</p>
+                <h3>运行日志</h3>
+              </div>
+              <div class="dialog-toolbar-actions">
+                <button id="clear-activity-log" class="icon-button danger-icon-button" type="button" aria-label="清空日志" data-tooltip="清空日志">
+                  <span class="trash-icon" aria-hidden="true"></span>
+                </button>
+              </div>
+            </div>
+            <div class="activity-dialog-toolbar activity-page-toolbar">
+              <div class="activity-toolbar-copy">
+                <div class="activity-toolbar-topline">
+                  <div id="activity-filter-label" class="activity-scope-note">当前范围：全部日志</div>
+                  <span class="activity-count-badge">最近 200 条</span>
+                </div>
+                <p class="activity-toolbar-description">记录启动、保存、刷新和错误信息，按时间倒序显示。</p>
+              </div>
+            </div>
+            <div class="activity-log-header" aria-hidden="true">
+              <span>事件</span>
+              <span>状态 / 时间</span>
+            </div>
+            <div id="activity-log" class="activity-log activity-log-page">
+              <div class="empty-state">
+                <strong>暂无日志</strong>
+                <span>启动浏览器、保存配置、切换节点后会显示记录。</span>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="root-dialog">
+      <form id="root-dialog-form" class="dialog-card root-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>添加目录池</h3>
+          </div>
+          <button id="close-root-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="segmented-tabs" role="tablist" aria-label="目录池添加方式">
+          <button id="root-tab-discover" class="segmented-tab active" type="button">读取候选目录</button>
+          <button id="root-tab-custom" class="segmented-tab" type="button">自定义输入</button>
+        </div>
+        <div id="root-dialog-error" class="form-error" hidden></div>
+        <section id="root-panel-discover" class="root-dialog-panel">
+          <div id="root-candidate-list" class="candidate-list">
+            <div class="empty-state">
+              <strong>正在读取候选目录</strong>
+              <span>会展示本机常见 Chrome 资料位置。</span>
+            </div>
+          </div>
+        </section>
+        <section id="root-panel-custom" class="root-dialog-panel" hidden>
+          <input id="new-root-path" type="text" placeholder="~/Library/Application Support/Google/CustomProfiles">
+        </section>
+        <div class="dialog-actions">
+          <button id="cancel-root-dialog" class="button ghost" value="cancel" type="button">取消</button>
+          <button id="save-root-dialog" class="button primary" value="default" type="submit">导入</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="route-card-template">
+      <article class="route-card">
+        <div class="route-row">
+          <div class="country-chip">
+            <span class="country-code"></span>
+          </div>
+          <div class="route-title">
+            <h3 class="route-label"></h3>
+            <p class="route-country"></p>
+            <div class="route-tags"></div>
+          </div>
+          <div class="route-metrics">
+            <div class="row-cell route-cell-cdp">
+              <span>CDP 端口</span>
+              <strong class="cdp-port"></strong>
+            </div>
+            <div class="row-cell route-cell-node">
+              <div class="node-caption-row">
+                <span>绑定节点</span>
+                <button class="node-delay-button" type="button">测速</button>
+              </div>
+              <div class="node-cell-main">
+                <strong class="node-name"></strong>
+                <small class="node-delay-result" data-state="idle">未测速</small>
+              </div>
+            </div>
+            <div class="row-cell wide route-cell-start-url">
+              <span>默认启动网址</span>
+              <strong class="start-url"></strong>
+            </div>
+          </div>
+          <div class="route-state-stack">
+            <div class="route-issues"></div>
+            <span class="state-pill"><span></span></span>
+          </div>
+          <div class="row-actions">
+            <button class="icon-button action-tool-button action-tool-button-primary launch-route" type="button" aria-label="启动浏览器" data-tooltip="启动浏览器">
+              <span class="action-icon action-icon-launch" aria-hidden="true"></span>
+            </button>
+            <button class="icon-button action-tool-button foreground-route" type="button" aria-label="定位窗口" data-tooltip="定位窗口">
+              <span class="action-icon action-icon-foreground" aria-hidden="true"></span>
+            </button>
+            <button class="icon-button action-tool-button edit-route" type="button" aria-label="编辑配置" data-tooltip="编辑配置">
+              <span class="action-icon action-icon-edit" aria-hidden="true"></span>
+            </button>
+            <button class="icon-button danger-icon-button delete-route" type="button" aria-label="删除配置" data-tooltip="删除配置">
+              <span class="trash-icon" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+
+      </article>
+    </template>
+
+    <dialog id="create-dialog">
+      <form id="create-route-form" class="dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3 id="create-dialog-title">添加浏览器配置</h3>
+          </div>
+          <button id="close-create-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="create-error" class="form-error" hidden></div>
+        <div class="editor-grid modal-grid create-stack">
+          <label class="wide">
+            <span class="field-caption-row">
+              <span>配置名称</span>
+            </span>
+            <input id="create-label" type="text" required placeholder="例如：TikTok Brazil 01">
+            <small id="create-label-hint" class="field-note"></small>
+          </label>
+          <label class="wide">
+            <span class="field-caption-row">
+              <span>CDP 端口</span>
+            </span>
+            <input id="create-cdp" inputmode="numeric" type="number" min="1" max="65535" required placeholder="自动分配，可手动修改">
+            <small id="create-cdp-hint" class="field-note"></small>
+          </label>
+          <label class="wide">
+            <span class="field-caption-row">
+              <span>绑定节点</span>
+            </span>
+            <select id="create-node"></select>
+            <small class="field-note"></small>
+          </label>
+          <label class="wide">
+            <span class="field-caption-row">
+              <span>启动网址</span>
+            </span>
+            <input id="create-start-url" type="text" placeholder="留空则启动 https://www.google.com/">
+            <small class="field-note"></small>
+          </label>
+          <div id="create-advanced-divider" class="create-advanced-divider">
+            <button id="toggle-create-advanced" class="advanced-trigger" type="button" aria-expanded="false">
+              <span>更多</span>
+              <span class="icon-toggle-chevron" aria-hidden="true"></span>
+            </button>
+          </div>
+          <section id="create-advanced-fields" class="create-advanced-fields" hidden>
+            <div class="wide storage-stack">
+              <label class="stacked-field">
+                <span class="field-caption-row">
+                  <span>浏览器身份来源</span>
+                </span>
+                <select id="create-user-data-dir"></select>
+                <small id="create-user-data-hint" class="field-note"></small>
+              </label>
+              <label class="stacked-field">
+                <span class="field-caption-row">
+                  <span>Chrome Profile</span>
+                </span>
+                <select id="create-profile-directory"></select>
+                <small id="create-profile-hint" class="field-note"></small>
+              </label>
+            </div>
+            <label class="wide">
+              <span class="field-caption-row">
+                <span>代理入口端口</span>
+              </span>
+              <input id="create-proxy-port" inputmode="numeric" type="number" min="1" max="65535" required placeholder="自动分配，可手动修改">
+              <small id="create-proxy-hint" class="field-note"></small>
+            </label>
+            <div class="create-advanced-collapse-row">
+              <button id="collapse-create-advanced" class="advanced-trigger" type="button">
+                <span>收起</span>
+                <span class="icon-toggle-chevron up" aria-hidden="true"></span>
+              </button>
+            </div>
+          </section>
+        </div>
+        <div class="dialog-actions">
+          <button id="cancel-create-route" class="button ghost" value="cancel" type="button">取消</button>
+          <button id="create-submit" class="button primary" value="default" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="guide-dialog">
+      <form class="dialog-card guide-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Quick Start</p>
+            <h3>使用指南</h3>
+          </div>
+          <button id="close-guide-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="guide-steps">
+          <article>
+            <span>01</span>
+            <div>
+              <strong>确认目录池</strong>
+              <p>首次打开会自动导入本机 Chrome 和已发现的独立身份目录，后续也可以手动导入。</p>
+            </div>
+          </article>
+          <article>
+            <span>02</span>
+            <div>
+              <strong>创建浏览器配置</strong>
+              <p>填写配置名称，确认 CDP 端口，绑定可用节点；高级项可选择身份目录和代理入口端口。</p>
+            </div>
+          </article>
+          <article>
+            <span>03</span>
+            <div>
+              <strong>启动并验证</strong>
+              <p>点击浏览器配置里的启动按钮，确认浏览器打开、代理在线、目标网站可以访问。</p>
+            </div>
+          </article>
+          <article>
+            <span>04</span>
+            <div>
+              <strong>交给 Agent 使用</strong>
+              <p>Codex 可通过 MD-Browser MCP 读取配置，并按指定配置打开网站或连接已有浏览器。</p>
+            </div>
+          </article>
+        </div>
+        <div class="dialog-actions guide-actions">
+          <button class="button ghost page-jump-button" type="button" data-target-page="storage">查看目录池</button>
+          <button class="button primary page-jump-button" type="button" data-target-page="routes">去创建配置</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="export-dialog">
+      <form class="dialog-card json-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>导出 JSON</h3>
+          </div>
+          <button id="close-export-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="json-format-row">
+          <span>导出格式</span>
+          <strong>MD-Browser 团队配置模板</strong>
+        </div>
+        <div class="json-action-row">
+          <button id="refresh-export-preview" class="button ghost" type="button">
+            <span class="json-button-icon json-button-icon-eye" aria-hidden="true"></span>
+            <span>预览</span>
+          </button>
+          <button id="copy-export-json" class="button ghost" type="button">
+            <span class="json-button-icon json-button-icon-copy" aria-hidden="true"></span>
+            <span>复制</span>
+          </button>
+          <button id="download-export-json" class="button primary" type="button">
+            <span class="json-button-icon json-button-icon-download" aria-hidden="true"></span>
+            <span>下载</span>
+          </button>
+        </div>
+        <textarea id="export-json-preview" class="json-textarea" readonly spellcheck="false"></textarea>
+      </form>
+    </dialog>
+
+    <dialog id="import-dialog">
+      <form id="import-template-form" class="dialog-card json-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>导入 JSON</h3>
+          </div>
+          <button id="close-import-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="json-format-row">
+          <span>导入格式</span>
+          <strong>MD-Browser 团队配置模板</strong>
+        </div>
+        <div id="import-error" class="form-error" hidden></div>
+        <textarea id="import-json-input" class="json-textarea import-json-textarea" spellcheck="false" placeholder="粘贴团队配置 JSON"></textarea>
+        <div id="import-preview" class="import-preview">
+          <div class="empty-state">
+            <strong>等待预览</strong>
+            <span>粘贴 JSON 后点击预览，系统会检查节点匹配情况。</span>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button id="preview-import-json" class="button ghost" type="button">预览</button>
+          <button id="submit-import-json" class="button primary" type="submit">确认导入</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="browser-dialog">
+      <form class="dialog-card browser-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>选择浏览器</h3>
+          </div>
+          <button id="close-browser-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="browser-candidate-list" class="browser-candidate-list">
+          <div class="empty-state">
+            <strong>正在扫描本机浏览器</strong>
+            <span>会查找常见 Chromium 浏览器。</span>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="proxy-client-dialog">
+      <form class="dialog-card browser-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>选择代理客户端</h3>
+          </div>
+          <button id="close-proxy-client-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="proxy-client-candidate-list" class="browser-candidate-list">
+          <div class="empty-state">
+            <strong>正在扫描代理客户端</strong>
+            <span>会查找 Clash Verge / Mihomo-compatible 客户端。</span>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/app.js?v=78"></script>
+  </body>
+</html>

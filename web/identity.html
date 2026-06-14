@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>正在读取浏览器配置</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Avenir Next", "Helvetica Neue", "PingFang SC", sans-serif;
+        --ink: #111827;
+        --muted: #64748b;
+        --line: #dbe3ed;
+        --blue: #2563eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 28px;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 16% 14%, rgba(37, 99, 235, 0.14), transparent 34%),
+          radial-gradient(circle at 82% 18%, rgba(20, 184, 166, 0.12), transparent 30%),
+          linear-gradient(135deg, #f6f8fb 0%, #eef3f8 100%);
+      }
+
+      .card {
+        width: min(880px, 100%);
+        border: 1px solid rgba(219, 227, 237, 0.94);
+        border-left: 8px solid var(--blue);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.86);
+        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+        padding: 30px;
+      }
+
+      .header {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 18px;
+        align-items: center;
+      }
+
+      .mark {
+        width: 72px;
+        height: 72px;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(37, 99, 235, 0.24);
+        border-radius: 22px;
+        background: rgba(37, 99, 235, 0.1);
+        color: #1d4ed8;
+        font-size: 24px;
+        font-weight: 900;
+      }
+
+      .eyebrow {
+        margin: 0 0 7px;
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(30px, 6vw, 54px);
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .tags span {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        border-radius: 999px;
+        background: rgba(37, 99, 235, 0.08);
+        color: #1d4ed8;
+        padding: 0 11px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .meta {
+        min-height: 74px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(248, 250, 252, 0.72);
+        padding: 12px;
+      }
+
+      .meta span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 7px;
+      }
+
+      .meta strong {
+        display: block;
+        overflow-wrap: anywhere;
+        font-size: 14px;
+      }
+
+      .status {
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 760px) {
+        .header,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <section class="header">
+        <div class="mark">TK</div>
+        <div>
+          <p class="eyebrow">Browser Identity</p>
+          <h1 id="label">正在读取配置</h1>
+          <div id="tags" class="tags"></div>
+        </div>
+      </section>
+      <section class="grid">
+        <div class="meta">
+          <span>CDP 端口</span>
+          <strong id="cdp">-</strong>
+        </div>
+        <div class="meta">
+          <span>代理入口</span>
+          <strong id="proxy">-</strong>
+        </div>
+        <div class="meta">
+          <span>绑定节点</span>
+          <strong id="node">-</strong>
+        </div>
+        <div class="meta">
+          <span>User Data Dir</span>
+          <strong id="user-data-dir">-</strong>
+        </div>
+        <div class="meta">
+          <span>Chrome Profile</span>
+          <strong id="profile">Default</strong>
+        </div>
+        <div class="meta">
+          <span>启动站点</span>
+          <strong id="start-url">-</strong>
+        </div>
+      </section>
+      <div id="status" class="status">此页用于识别当前浏览器配置，可保留作为第一个标签页。</div>
+    </main>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const routeKey = params.get("route");
+
+      function text(id, value) {
+        document.querySelector(id).textContent = value || "-";
+      }
+
+      function routeState(route) {
+        const browserReady = route.cdpReady || Boolean(route.cdpVersion);
+        if (browserReady && route.proxyListening) return "已就绪";
+        if (browserReady) return "仅浏览器";
+        if (route.proxyListening) return "仅代理";
+        return "未启动";
+      }
+
+      async function main() {
+        try {
+          const response = await fetch("/api/status");
+          const data = await response.json();
+          const route = data.routes && data.routes[routeKey];
+          if (!route) throw new Error("未找到当前浏览器配置。");
+
+          document.title = `${route.label} · CDP ${route.cdpPort}`;
+          text("#label", route.label);
+          text("#cdp", route.cdpPort);
+          text("#proxy", route.proxyUrl);
+          text("#node", route.nodeName || "未绑定");
+          text("#user-data-dir", route.userDataDirName || route.profileName);
+          text("#profile", route.profileDirectory || "Default");
+          text("#start-url", route.startUrl);
+          text("#status", `当前状态：${routeState(route)}。此页用于识别当前浏览器配置，可保留作为第一个标签页。`);
+
+          document.querySelector("#tags").innerHTML = (route.tags || [])
+            .map((tag) => `<span>${tag.replaceAll("&", "&amp;").replaceAll("<", "&lt;")}</span>`)
+            .join("");
+
+        } catch (error) {
+          document.title = "浏览器配置读取失败";
+          text("#label", "配置读取失败");
+          text("#status", error.message || "请确认 MD-Browser 本地服务正在运行。");
+        }
+      }
+
+      main();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+# Copy this block into Clash Verge / Mihomo merge config when using
+# an external Mihomo-compatible client, then replace the proxy values
+# with your real node names.
+#
+# The important idea:
+# - 18101/18102 are browser proxy entry ports.
+# - CDP ports such as 9222/9223 belong to Chrome launch args, not here.
+# - Listener names can match your MD-Browser config names.
+
+listeners:
+  - name: browser-config-01
+    type: mixed
+    listen: 127.0.0.1
+    port: 18101
+    proxy: "YOUR_NODE_NAME_01"
+    udp: true
+
+  - name: browser-config-02
+    type: mixed
+    listen: 127.0.0.1
+    port: 18102
+    proxy: "YOUR_NODE_NAME_02"
+    udp: true

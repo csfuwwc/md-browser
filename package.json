@@ -1,0 +1,61 @@
+{
+  "name": "md-browser",
+  "version": "0.1.0",
+  "description": "Local browser profile and proxy route manager for cross-border workflows.",
+  "author": "Modian AI",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "mcp": "node mcp/md-browser-mcp.js",
+    "desktop": "electron .",
+    "test": "node --test tests/*.test.js",
+    "clean:dist": "node scripts/clean_dist.cjs dist dist-signed",
+    "prepackage:mac": "npm run clean:dist",
+    "package:mac": "electron-builder --mac dmg zip --arm64",
+    "prepackage:mac:signed": "npm run clean:dist && node scripts/preflight_signed_mac.cjs",
+    "package:mac:signed": "electron-builder --config electron-builder.signed.yml --mac dmg zip --arm64",
+    "verify:mac:signed": "node scripts/verify_signed_mac.cjs",
+    "release:manifest": "node scripts/release_manifest.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "lucide-static": "^1.17.0"
+  },
+  "devDependencies": {
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2"
+  },
+  "build": {
+    "appId": "com.local.md-browser",
+    "productName": "MD-Browser",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "web/**/*",
+      "build/icon.icns",
+      "config/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    }
+  }
+}
