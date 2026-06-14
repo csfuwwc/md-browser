@@ -48,7 +48,15 @@ const rootDir = fileURLToPath(new URL("..", import.meta.url));
 const webDir = join(rootDir, "web");
 let runningServer;
 
+function applyCors(res) {
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-max-age", "86400");
+}
+
 function sendJson(res, status, body) {
+  applyCors(res);
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(`${JSON.stringify(body, null, 2)}\n`);
 }
@@ -542,6 +550,13 @@ async function routeNodeDelay(key, config) {
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://127.0.0.1");
   const config = loadConfig();
+
+  if (req.method === "OPTIONS") {
+    applyCors(res);
+    res.writeHead(204);
+    res.end();
+    return;
+  }
 
   if (req.method === "GET" && url.pathname === "/api/config") {
     return sendJson(res, 200, config);
@@ -1114,6 +1129,7 @@ function serveStatic(req, res) {
   const requestPath = url.pathname === "/" ? "/index.html" : url.pathname;
   const filePath = normalize(join(webDir, requestPath));
   if (!filePath.startsWith(webDir) || !existsSync(filePath)) {
+    applyCors(res);
     res.writeHead(404);
     res.end("Not found");
     return;
@@ -1125,6 +1141,7 @@ function serveStatic(req, res) {
     ".svg": "image/svg+xml",
     ".png": "image/png"
   }[extname(filePath)] || "text/plain; charset=utf-8";
+  applyCors(res);
   res.writeHead(200, {
     "content-type": type,
     "cache-control": "no-store"
@@ -1134,18 +1151,24 @@ function serveStatic(req, res) {
 
 export function createAppServer() {
   return createServer((req, res) => {
-  const pathname = new URL(req.url, "http://127.0.0.1").pathname;
-  if (pathname === "/mcp") {
-    handleMcpHttp(req, res).catch((error) => sendJson(res, error.statusCode || 500, {
-      jsonrpc: "2.0",
-      id: null,
-      error: { code: -32603, message: error.message }
-    }));
-  } else if (req.url.startsWith("/api/")) {
-    handleApi(req, res).catch((error) => sendJson(res, error.statusCode || 500, serializeApiError(error)));
-  } else {
-    serveStatic(req, res);
-  }
+    const pathname = new URL(req.url, "http://127.0.0.1").pathname;
+    if (req.method === "OPTIONS" && (pathname === "/mcp" || pathname.startsWith("/api/"))) {
+      applyCors(res);
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (pathname === "/mcp") {
+      handleMcpHttp(req, res).catch((error) => sendJson(res, error.statusCode || 500, {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32603, message: error.message }
+      }));
+    } else if (req.url.startsWith("/api/")) {
+      handleApi(req, res).catch((error) => sendJson(res, error.statusCode || 500, serializeApiError(error)));
+    } else {
+      serveStatic(req, res);
+    }
   });
 }
 
