@@ -50,7 +50,7 @@ let runningServer;
 
 function applyCors(res) {
   res.setHeader("access-control-allow-origin", "*");
-  res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.setHeader("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   res.setHeader("access-control-allow-headers", "content-type");
   res.setHeader("access-control-max-age", "86400");
 }
@@ -290,7 +290,7 @@ export async function repairExternalProxy(config, {
     nextConfig = updateSettingsImpl({ mihomo: mihomoPatch });
   }
 
-  if (nextConfig.proxyClient?.mode !== "external") {
+  if (selectedClient?.appInstalled && nextConfig.proxyClient?.mode !== "external") {
     nextConfig = updateSettingsImpl({ proxyClient: { mode: "external" } });
     actions.push({ key: "switch-mode", label: "切换到外部代理模式" });
   }
@@ -314,8 +314,10 @@ export async function repairExternalProxy(config, {
   ];
 
   let externalState = { connected: false, nodeCount: 0, error: "" };
-  if (controllerUrl) {
+  if (selectedClient?.appInstalled && controllerUrl) {
     externalState = await probeExternalImpl(nextConfig.mihomo);
+  } else if (!selectedClient?.appInstalled) {
+    externalState = { connected: false, nodeCount: 0, error: "未检测到 Clash Verge Rev，请先安装并启动。" };
   }
   const probeChecks = classifyExternalProbe(externalState);
   checks.push(probeChecks.controller, probeChecks.secret, probeChecks.nodes);
@@ -339,7 +341,14 @@ export async function repairExternalProxy(config, {
 }
 
 export async function externalProxyStatus(config) {
-  const clients = listExternalProxyClientCandidates(config.mihomo || {});
+  return externalProxyStatusWithDeps(config);
+}
+
+export async function externalProxyStatusWithDeps(config, {
+  listClientsImpl = listExternalProxyClientCandidates,
+  waitForExternalImpl = waitForExternalMihomo
+} = {}) {
+  const clients = listClientsImpl(config.mihomo || {});
   const selectedClient = clients.find((client) => client.appInstalled || client.installed) || clients[0] || null;
   const controllerUrl = String(config.mihomo?.controllerUrl || "").trim();
   const mergePath = config.mihomo?.mergePath ? expandHome(config.mihomo.mergePath) : "";
@@ -353,15 +362,17 @@ export async function externalProxyStatus(config) {
   ];
 
   let external = { connected: false, nodeCount: 0, error: controllerUrl ? "外部代理客户端未连接" : "未配置控制地址" };
-  if (controllerUrl) {
-    external = await waitForExternalMihomo(config.mihomo, { attempts: 1, intervalMs: 0 });
+  if (selectedClient?.appInstalled && controllerUrl) {
+    external = await waitForExternalImpl(config.mihomo, { attempts: 1, intervalMs: 0 });
+  } else if (!selectedClient?.appInstalled) {
+    external = { connected: false, nodeCount: 0, error: "未检测到 Clash Verge Rev，请先安装并启动。" };
   }
   const probeChecks = classifyExternalProbe(external);
   checks.push(probeChecks.controller, probeChecks.secret, probeChecks.nodes);
 
   return {
-    connected: external.connected === true,
-    nodeCount: Number(external.nodeCount || 0),
+    connected: selectedClient?.appInstalled && external.connected === true,
+    nodeCount: selectedClient?.appInstalled ? Number(external.nodeCount || 0) : 0,
     error: external.error || "",
     checks,
     summary: summarizeExternalRepair(checks)
@@ -373,6 +384,20 @@ async function startExternalProxy(config) {
     try {
       stopEmbeddedMihomo(config.embeddedMihomo);
     } catch {}
+  }
+  const clients = listExternalProxyClientCandidates(config.mihomo || {});
+  const selectedClient = clients.find((client) => client.appInstalled || client.installed) || clients[0] || null;
+  if (!selectedClient?.appInstalled) {
+    return {
+      config,
+      external: {
+        connected: false,
+        nodeCount: 0,
+        opened: false,
+        reason: "app-not-found",
+        error: "未检测到 Clash Verge Rev，请先安装并启动。"
+      }
+    };
   }
   const openResult = openExternalProxyApp();
   const updatedConfig = updateSystemSettings({ proxyClient: { mode: "external" } });

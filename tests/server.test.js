@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { autoRepairLaunchRoute, buildSupportBundle, checkForUpdate, compareVersions, createAppServer, appInfo, defaultUpdateManifestUrl, enableEmbeddedMihomo, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, parseChangelogMarkdown, repairEmbeddedMihomo, repairExternalProxy, resolveReleaseDownloadLink, safeReloadConfig, sanitizeConfigForSupport } from "../src/server.js";
+import { autoRepairLaunchRoute, buildSupportBundle, checkForUpdate, compareVersions, createAppServer, appInfo, defaultUpdateManifestUrl, enableEmbeddedMihomo, externalProxyStatusWithDeps, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, parseChangelogMarkdown, repairEmbeddedMihomo, repairExternalProxy, resolveReleaseDownloadLink, safeReloadConfig, sanitizeConfigForSupport } from "../src/server.js";
 import { defaultConfig, loadConfig, saveConfig } from "../src/config.js";
 
 test("appInfo reads package metadata for version display", () => {
@@ -154,6 +154,54 @@ test("HTTP MCP endpoint initializes and lists tools", async () => {
     restoreHome(previousHome);
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("preflight response allows PUT for packaged app cross-origin requests", async () => {
+  let server;
+  try {
+    server = await listenOnRandomPort(createAppServer());
+    const response = await fetch(`${server.url}/api/routes/env-2/node`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "app://localhost",
+        "access-control-request-method": "PUT",
+        "access-control-request-headers": "content-type"
+      }
+    });
+
+    assert.equal(response.status, 204);
+    assert.match(response.headers.get("access-control-allow-methods") || "", /\bPUT\b/);
+  } finally {
+    if (server) await server.close();
+  }
+});
+
+test("external proxy status stays disconnected when client app is not installed", async () => {
+  const status = await externalProxyStatusWithDeps({
+    ...defaultConfig,
+    proxyClient: { mode: "external" },
+    mihomo: {
+      ...defaultConfig.mihomo,
+      controllerUrl: "http://127.0.0.1:9090"
+    }
+  }, {
+    listClientsImpl: () => [{
+      id: "clash-verge-rev",
+      label: "Clash Verge Rev",
+      installed: false,
+      appInstalled: false
+    }],
+    waitForExternalImpl: async () => ({
+      connected: true,
+      nodeCount: 12,
+      error: ""
+    })
+  });
+
+  assert.equal(status.connected, false);
+  assert.equal(status.nodeCount, 0);
+  assert.match(status.error, /未检测到 Clash Verge Rev/);
+  assert.equal(status.checks.find((item) => item.key === "client")?.status, "fail");
 });
 
 test("agent node delay endpoint preserves not found status when enabled", async () => {

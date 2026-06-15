@@ -1,6 +1,6 @@
 [package]
 name = "md-browser-shell"
-version = "1.0.4"
+version = "1.0.5"
 description = "MD-Browser Tauri shell"
 authors = ["MD-Browser contributors"]
 license = "MIT"

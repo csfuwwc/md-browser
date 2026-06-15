@@ -126,15 +126,27 @@ function settleDeleteRouteDialog(confirmed) {
 }
 
 async function api(path, options) {
+  const requestOptions = options || {};
+  const method = String(requestOptions.method || "GET").toUpperCase();
+  const targetUrl = apiUrl(path);
   let response;
-  try {
-    response = await fetch(apiUrl(path), options);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/Failed to fetch/i.test(message)) {
-      throw new Error("WebUI 服务连接已断开，请重新启动本地页面服务。");
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      response = await fetch(targetUrl, requestOptions);
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const retryable = /Failed to fetch|Load failed|NetworkError|network connection was lost/i.test(message);
+      if (!retryable || attempt > 0) break;
+      await delay(180);
     }
-    throw error;
+  }
+  if (lastError) {
+    const message = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(`本地服务请求失败：${method} ${path} · ${message}`);
   }
   if (!response.ok) {
     const text = await response.text();
@@ -586,12 +598,12 @@ async function openVersionDownload(version) {
 function openEmbeddedSubscriptionDialog() {
   clearEmbeddedSubscriptionError();
   setEmbeddedSubscriptionValue(embeddedSubscriptionValue());
-  document.querySelector("#embedded-subscription-dialog").showModal();
+  openDialogCompat("#embedded-subscription-dialog");
   window.setTimeout(() => document.querySelector("#settings-embedded-subscription-url")?.focus(), 0);
 }
 
 function closeEmbeddedSubscriptionDialog() {
-  document.querySelector("#embedded-subscription-dialog").close();
+  closeDialogCompat("#embedded-subscription-dialog");
 }
 
 function setEmbeddedSubscriptionError(message) {
@@ -637,16 +649,15 @@ function renderProxyClientState({ connected, nodeCount = 0, detail = "" }) {
   const externalActive = proxyMode === "external";
   const externalConnected = latestExternalProxyStatus?.connected ?? connected;
   const detectedClient = latestExternalProxyClients.find((client) => client.appInstalled || client.installed) || latestExternalProxyClients[0] || null;
-  state.dataset.state = externalConnected ? "online" : externalActive ? "offline" : "checking";
-  state.textContent = externalConnected ? "已连接" : externalActive ? "未连接" : "未启用";
+  const clientInstalled = Boolean(detectedClient?.appInstalled);
+  state.dataset.state = externalConnected ? "online" : externalActive || clientInstalled ? "offline" : "checking";
+  state.textContent = externalConnected ? "已连接" : clientInstalled ? "未连接" : "未安装";
   const resolvedNodeCount = Number.isFinite(latestExternalProxyStatus?.nodeCount) ? latestExternalProxyStatus.nodeCount : nodeCount;
   detailNode.textContent = externalConnected
     ? `节点池 ${resolvedNodeCount} 个`
-    : externalActive
-      ? detectedClient?.appInstalled
-        ? "已检测到 Clash Verge Rev，本机控制接口暂未连通。"
-        : "当前未检测到可用的外部代理客户端。"
-      : "点击启动后使用外部代理。";
+    : clientInstalled
+      ? "已检测到 Clash Verge Rev，本机控制接口暂未连通。"
+      : "当前未检测到可用的外部代理客户端。";
   renderExternalProxyChecks({ connected, nodeCount, detail });
   renderProxyServiceCards();
 }
@@ -669,11 +680,11 @@ function togglePasswordVisibility(inputSelector, buttonSelector) {
 }
 
 function openExternalControllerGuideDialog() {
-  document.querySelector("#external-controller-guide-dialog")?.showModal();
+  openDialogCompat("#external-controller-guide-dialog");
 }
 
 function closeExternalControllerGuideDialog() {
-  document.querySelector("#external-controller-guide-dialog")?.close();
+  closeDialogCompat("#external-controller-guide-dialog");
 }
 
 function jumpToProxyAdvancedSettings() {
@@ -866,16 +877,19 @@ function renderProxyServiceCards() {
   const externalButton = document.querySelector("#toggle-external-proxy");
   const embeddedButton = document.querySelector("#toggle-embedded-mihomo");
   const embeddedRunning = Boolean(currentEmbeddedMihomoStatus?.processRunning || currentEmbeddedMihomoStatus?.apiConnected);
+  const detectedClient = latestExternalProxyClients.find((client) => client.appInstalled || client.installed) || latestExternalProxyClients[0] || null;
+  const externalConnected = Boolean(latestExternalProxyStatus?.connected);
+  const externalInstalled = Boolean(detectedClient?.appInstalled);
+  const externalRunning = mode === "external" && externalConnected;
   if (modeInput) modeInput.value = mode;
-  if (external) external.dataset.active = mode === "external" ? "true" : "false";
+  if (external) external.dataset.active = externalRunning ? "true" : "false";
   if (embedded) embedded.dataset.active = mode === "embedded" ? "true" : "false";
-  if (externalBadge) externalBadge.textContent = mode === "external" ? "使用中" : "未启用";
+  if (externalBadge) externalBadge.textContent = externalConnected ? "使用中" : externalInstalled ? "未连接" : "未安装";
   if (embeddedBadge) embeddedBadge.textContent = mode === "embedded" && embeddedRunning ? "使用中" : "未启动";
   if (externalButton) {
-    const active = mode === "external";
-    externalButton.textContent = proxyOperationState.external || (active ? "停止" : "启动");
-    externalButton.classList.toggle("danger", active);
-    externalButton.classList.toggle("primary", !active);
+    externalButton.textContent = proxyOperationState.external || (externalRunning ? "停止" : "启动");
+    externalButton.classList.toggle("danger", externalRunning);
+    externalButton.classList.toggle("primary", !externalRunning);
   }
   if (embeddedButton) {
     const active = mode === "embedded" && embeddedRunning;
@@ -936,22 +950,22 @@ function setLocalAdvancedExpanded(expanded) {
 
 async function openBrowserDialog() {
   const dialog = document.querySelector("#browser-dialog");
-  dialog.showModal();
+  openDialogCompat(dialog);
   await renderBrowserCandidates();
 }
 
 function closeBrowserDialog() {
-  document.querySelector("#browser-dialog").close();
+  closeDialogCompat("#browser-dialog");
 }
 
 async function openProxyClientDialog() {
   const dialog = document.querySelector("#proxy-client-dialog");
-  dialog.showModal();
+  openDialogCompat(dialog);
   await renderProxyClientCandidates();
 }
 
 function closeProxyClientDialog() {
-  document.querySelector("#proxy-client-dialog").close();
+  closeDialogCompat("#proxy-client-dialog");
 }
 
 async function renderBrowserCandidates() {
@@ -1342,7 +1356,8 @@ async function switchProxyClientMode(mode) {
 async function toggleExternalProxy() {
   const button = document.querySelector("#toggle-external-proxy");
   const originalText = button.textContent;
-  if (currentProxyMode() === "external") {
+  const externalRunning = currentProxyMode() === "external" && Boolean(latestExternalProxyStatus?.connected);
+  if (externalRunning) {
     setProxyOperationState("external", "停止中...");
     button.disabled = true;
     button.textContent = "停止中...";
@@ -2044,12 +2059,12 @@ async function openRootDialog() {
   clearRootDialogError();
   document.querySelector("#new-root-path").value = "";
   renderRootDialogMode("discover");
-  document.querySelector("#root-dialog").showModal();
+  openDialogCompat("#root-dialog");
   loadRootCandidates();
 }
 
 function closeRootDialog() {
-  document.querySelector("#root-dialog").close();
+  closeDialogCompat("#root-dialog");
 }
 
 async function submitRootDialog(event) {
@@ -2109,30 +2124,30 @@ async function openCreateDialog(routeKey = "") {
   );
   renderNodeSelect(document.querySelector("#create-node"), route?.nodeName || "");
   syncCreatePortValidation({ showErrors: false });
-  dialog.showModal();
+  openDialogCompat(dialog);
 }
 
 function closeCreateDialog() {
   editingRouteKey = "";
-  document.querySelector("#create-dialog").close();
+  closeDialogCompat("#create-dialog");
 }
 
 function openGuideDialog() {
-  document.querySelector("#guide-dialog").showModal();
+  openDialogCompat("#guide-dialog");
 }
 
 function closeGuideDialog() {
   markGuideDismissed();
-  document.querySelector("#guide-dialog").close();
+  closeDialogCompat("#guide-dialog");
 }
 
 async function openExportDialog() {
-  document.querySelector("#export-dialog").showModal();
+  openDialogCompat("#export-dialog");
   await refreshExportPreview();
 }
 
 function closeExportDialog() {
-  document.querySelector("#export-dialog").close();
+  closeDialogCompat("#export-dialog");
 }
 
 async function refreshExportPreview() {
@@ -2407,11 +2422,11 @@ function openImportDialog() {
   clearImportError();
   document.querySelector("#import-json-input").value = "";
   renderImportPreview(null);
-  document.querySelector("#import-dialog").showModal();
+  openDialogCompat("#import-dialog");
 }
 
 function closeImportDialog() {
-  document.querySelector("#import-dialog").close();
+  closeDialogCompat("#import-dialog");
 }
 
 function clearImportError() {
@@ -2758,6 +2773,27 @@ function pushActivity(level, message, detail = "", options = {}) {
   renderActivityLog();
 }
 
+function formatClientErrorDetail(error, fallback = "") {
+  if (error instanceof Error) {
+    return error.stack || error.message || fallback;
+  }
+  if (error && typeof error === "object") {
+    try {
+      return JSON.stringify(error);
+    } catch {}
+  }
+  return String(error || fallback || "").trim();
+}
+
+function reportUnhandledClientError(message, error, fallback = "") {
+  const detail = formatClientErrorDetail(error, fallback);
+  pushActivity("error", message, detail, { category: "browser" });
+  const createDialogOpen = document.querySelector("#create-dialog")?.hasAttribute("open");
+  if (createDialogOpen && detail) {
+    showCreateError(`${message}\n${detail}`);
+  }
+}
+
 function inferActivityCategory(message, detail = "", options = {}) {
   if (options.routeKey) return "browser";
   const text = `${message} ${detail}`.toLowerCase();
@@ -3057,6 +3093,16 @@ document.querySelector("#create-user-data-dir").addEventListener("change", (even
   syncCreatePortValidation();
 });
 window.addEventListener("hashchange", syncPageFromHash);
+window.addEventListener("error", (event) => {
+  reportUnhandledClientError(
+    "页面脚本异常",
+    event.error,
+    [event.message, event.filename, event.lineno, event.colno].filter(Boolean).join(" · ")
+  );
+});
+window.addEventListener("unhandledrejection", (event) => {
+  reportUnhandledClientError("未处理的请求异常", event.reason, "Promise rejection");
+});
 
 syncPageFromHash();
 renderSettingsBasics();
