@@ -37,6 +37,7 @@ let pendingDeleteRouteDialogResolve = null;
 let latestExternalRepairResult = null;
 let latestExternalProxyClients = [];
 let latestExternalProxyStatus = null;
+let nativeUpdateInstallInFlight = false;
 
 const PAGE_META = {
   dashboard: { eyebrow: "Local Browser Router", title: "仪表盘" },
@@ -60,6 +61,23 @@ function serviceBaseUrl() {
 
 function apiUrl(path) {
   return new URL(path, `${serviceBaseUrl()}/`).toString();
+}
+
+function tauriUpdaterApi() {
+  return window.__TAURI__?.updater || null;
+}
+
+function tauriProcessApi() {
+  return window.__TAURI__?.process || null;
+}
+
+function canUseNativeUpdateInstall(result = latestUpdateResult) {
+  return Boolean(
+    result?.updateAvailable
+      && result?.downloadUrl
+      && tauriUpdaterApi()
+      && tauriProcessApi()
+  );
 }
 
 async function openExternalUrl(url) {
@@ -2309,9 +2327,17 @@ function renderUpdateDialog(result = {}) {
       ? `检测到可更新版本 v${result.latestVersion}。`
       : `当前客户端 v${result.currentVersion} 已是最新版本。`;
   const notes = Array.isArray(result.notes) ? result.notes.filter(Boolean) : [];
+  const nativeInstallAvailable = canUseNativeUpdateInstall(result);
 
   downloadButton.hidden = !(result.updateAvailable && result.downloadUrl);
   downloadButton.dataset.url = result.downloadUrl || "";
+  downloadButton.dataset.mode = nativeInstallAvailable ? "native" : "external";
+  downloadButton.disabled = nativeUpdateInstallInFlight;
+  downloadButton.textContent = nativeUpdateInstallInFlight
+    ? "安装中..."
+    : nativeInstallAvailable
+      ? "下载并安装"
+      : "前往下载";
 
   container.innerHTML = `
     <article class="update-status-card">
@@ -2341,6 +2367,56 @@ function renderUpdateDialog(result = {}) {
       </section>
     ` : ""}
   `;
+}
+
+async function installNativeUpdate() {
+  const updater = tauriUpdaterApi();
+  const processApi = tauriProcessApi();
+  if (!updater || !processApi) return false;
+
+  const button = document.querySelector("#open-update-download");
+  const previousText = button?.textContent || "下载并安装";
+  nativeUpdateInstallInFlight = true;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "安装中...";
+  }
+  try {
+    const update = await updater.check();
+    if (!update) {
+      pushActivity("success", "已是最新版本", "当前桌面客户端已经是最新版本。");
+      saveLatestUpdateResult({
+        ...(latestUpdateResult || {}),
+        updateAvailable: false
+      });
+      renderUpdateDialog(latestUpdateResult);
+      return true;
+    }
+
+    pushActivity("info", "开始安装更新", `正在下载并安装 v${update.version || latestUpdateResult?.latestVersion || ""}`.trim());
+    await update.downloadAndInstall((event) => {
+      if (event?.event === "Started") {
+        pushActivity("info", "正在下载更新", "下载已开始，请稍候。");
+      }
+      if (event?.event === "Finished") {
+        pushActivity("success", "更新已下载", "安装包下载完成，准备重启客户端。");
+      }
+    });
+    pushActivity("success", "更新安装完成", "客户端将自动重启并进入新版本。");
+    await processApi.relaunch();
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "未知错误");
+    pushActivity("error", "安装更新失败", message);
+    throw error;
+  } finally {
+    nativeUpdateInstallInFlight = false;
+    if (button) {
+      button.disabled = false;
+      button.textContent = previousText;
+    }
+    renderUpdateDialog(latestUpdateResult || {});
+  }
 }
 
 async function openChangelogDialog() {
@@ -3001,6 +3077,13 @@ document.querySelector("#open-changelog-from-update").addEventListener("click", 
 });
 document.querySelector("#open-update-download").addEventListener("click", (event) => {
   const url = event.currentTarget.dataset.url || "";
+  const mode = event.currentTarget.dataset.mode || "external";
+  if (mode === "native") {
+    installNativeUpdate().catch((error) => {
+      pushActivity("error", "安装更新失败", error.message || String(error));
+    });
+    return;
+  }
   if (!url) return;
   openExternalUrl(url).then((opened) => {
     if (!opened) {

@@ -129,19 +129,19 @@ dist/release-summary-v<version>.json
 dist/latest-mac-arm64.json
 ```
 
-如果当前构建同时带有 Tauri updater 产物 `.app.tar.gz` 和 `.sig`，还会额外生成：
+桌面构建现在会额外生成 Tauri updater 产物：
 
 ```text
 dist-tauri/latest.json
 ```
 
-可以通过 `MD_BROWSER_RELEASE_ARTIFACT` 显式指定要发布的 `.dmg` 文件。清单里包含版本号、渠道、文件名、下载地址、文件大小和 SHA-256；`dist-tauri/latest.json` 则用于后续 Tauri 原生更新链路。
+可以通过 `MD_BROWSER_RELEASE_ARTIFACT` 显式指定要发布的 `.dmg` 文件。清单里包含版本号、渠道、文件名、下载地址、文件大小和 SHA-256；`dist-tauri/latest.json` 用于桌面客户端原生更新。
 
 ## 客户端升级策略
 
-### 阶段 1：手动升级
+### 阶段 1：首次安装
 
-这是当前最稳的方式。
+首次分发仍然使用 `.dmg`。
 
 - 团队成员下载新版 `.dmg`
 - 拖动覆盖 `/Applications/MD-Browser.app`
@@ -150,14 +150,14 @@ dist-tauri/latest.json
 - Chrome 登录态继续保存在用户选择的 `user-data-dir`
 - 升级 App 不覆盖任何登录态和本机配置
 
-适合内测期，因为发布节奏快，问题也容易回滚。
+适合团队第一次安装客户端。
 
-### 阶段 2：半自动升级提醒
+### 阶段 2：客户端内直接升级
 
 客户端启动时读取一个远端版本文件。当前兼容两种格式：
 
-- 现有 DMG 发布清单：`latest-mac-arm64.json`
-- 未来 Tauri 原生更新清单：`latest.json`
+- Tauri 原生更新清单：`latest.json`
+- 兼容旧版 DMG 发布清单：`latest-mac-arm64.json`
 
 Tauri `latest.json` 示例：
 
@@ -175,13 +175,13 @@ Tauri `latest.json` 示例：
 }
 ```
 
-如果远端版本高于本地版本，客户端会在“设置”的版本信息卡片里提示“发现新版本”。这个阶段不在客户端内自动替换 App，风险低。
+如果远端版本高于本地版本，客户端会在“设置”的版本信息卡片里提示“发现新版本”，并在桌面 App 内提供“下载并安装”按钮。安装完成后客户端自动重启进入新版本。
 
-`v1.0.2` 已实现这个阶段的基础接口和按钮：
+`v1.1.0` 已实现这个阶段：
 
 - `GET /api/update-check`：读取 release manifest，判断是否有新版。
-- “检查更新”按钮：在页面运行日志里显示结果。
-- 仍由负责人分发新版 `.dmg`，用户手动覆盖安装。
+- “检查更新”按钮：在页面运行日志里显示结果，并在桌面 App 内直接调用原生 updater。
+- 发布时必须同时上传 `.dmg`、`.app.tar.gz`、`.app.tar.gz.sig` 和 `latest.json`。
 
 ## 排障包策略
 
@@ -204,23 +204,15 @@ Tauri `latest.json` 示例：
 - Mihomo secret 明文
 - 内置订阅地址明文
 
-### 阶段 3：自动更新
+### 阶段 3：稳定分发
 
-功能稳定后再接入自动更新。
+功能继续稳定后，再补这些增强项：
 
-推荐路线：
-
-- 使用 Tauri 原生更新链路
 - 发布渠道分成 `latest` 和 `beta`
 - 更新元数据与安装包放在 GitHub Releases、S3、OSS 或公司内部分发域名
 - 每次发布都必须签名、公证、staple
-- 自动更新只更新 App 本体，不修改 `~/.md-browser/config.json`
-
-自动更新需要额外处理：
-
 - 更新下载失败重试
 - 更新前提醒用户关闭正在运行的浏览器任务
-- 更新后保留本地端口、节点、目录池、profile 选择
 - 失败回滚到旧版本
 
 ## 配置兼容策略

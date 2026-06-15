@@ -102,6 +102,22 @@ MD_BROWSER_RELEASE_BASE_URL=https://github.com/csfuwwc/md-browser/releases/lates
 npm run release:prepare
 ```
 
+生成原生更新签名密钥：
+
+```bash
+npm run tauri:signer:generate
+```
+
+如果要发布支持客户端内直接升级的版本，打包前需要先注入签名私钥：
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/md-browser.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+npm run package:mac
+MD_BROWSER_RELEASE_BASE_URL=https://github.com/csfuwwc/md-browser/releases/latest/download \
+npm run release:prepare
+```
+
 更完整的打包与升级说明见 [docs/client-release-and-upgrade.md](docs/client-release-and-upgrade.md)。
 
 ## 代理后端

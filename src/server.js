@@ -557,7 +557,7 @@ export function defaultUpdateManifestUrl({ packagePath = join(rootDir, "package.
     const match = source.match(/github\.com\/([^/]+)\/([^/#]+)/i);
     if (!match) return "";
     const [, owner, repo] = match;
-    return `https://github.com/${owner}/${repo}/releases/latest/download/latest-mac-arm64.json`;
+    return `https://github.com/${owner}/${repo}/releases/latest/download/latest.json`;
   } catch {
     return "";
   }

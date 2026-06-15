@@ -161,12 +161,17 @@ fn shutdown_service(service: &ManagedService) {
 pub fn run() {
     tauri::Builder::default()
         .manage(ManagedService(Mutex::new(None)))
+        .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Info)
                 .build(),
         )
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())
+                .map_err(|error| format!("failed to initialize updater plugin: {error}"))?;
             let service = app.state::<ManagedService>();
             setup_app(&app.handle(), &service).map_err(Into::into)
         })

@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.1.0 - 2026-06-15
+
+### Added
+
+- 桌面客户端接入 Tauri 原生更新能力，设置页“检查更新”发现新版本后可直接下载、安装并自动重启进入新版。
+- 打包链路现在会同时生成 `.dmg`、`.app.tar.gz`、`.app.tar.gz.sig` 和 `latest.json`，可直接用于桌面端增量升级。
+
+### Changed
+
+- 默认版本清单地址切回 `latest.json`，并继续兼容旧的 `latest-mac-arm64.json`，统一 Web 端、桌面端和发布脚本的更新入口。
+
 ## v1.0.5 - 2026-06-15
 
 ### Changed

@@ -102,6 +102,22 @@ MD_BROWSER_RELEASE_BASE_URL=https://github.com/csfuwwc/md-browser/releases/lates
 npm run release:prepare
 ```
 
+Native updater signing key generation:
+
+```bash
+npm run tauri:signer:generate
+```
+
+When building a release that supports in-app updates, export the signing key before packaging:
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/md-browser.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+npm run package:mac
+MD_BROWSER_RELEASE_BASE_URL=https://github.com/csfuwwc/md-browser/releases/latest/download \
+npm run release:prepare
+```
+
 More packaging and upgrade notes live in [docs/client-release-and-upgrade.md](docs/client-release-and-upgrade.md).
 
 ## Proxy Backends

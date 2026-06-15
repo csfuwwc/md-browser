@@ -376,7 +376,7 @@ test("defaultUpdateManifestUrl derives GitHub latest download manifest", () => {
     }));
     assert.equal(
       defaultUpdateManifestUrl({ packagePath }),
-      "https://github.com/csfuwwc/md-browser/releases/latest/download/latest-mac-arm64.json"
+      "https://github.com/csfuwwc/md-browser/releases/latest/download/latest.json"
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
