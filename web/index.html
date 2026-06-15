@@ -272,11 +272,13 @@
                         <em id="settings-external-active">未启用</em>
                       </div>
                       <small id="settings-proxy-client-detail">连接本机已安装的 Clash Verge / Mihomo-compatible 客户端。</small>
+                      <small id="settings-external-next-step" class="proxy-next-step">首次使用请先确认 Clash Verge Rev 已导入订阅，并开启 external-controller。</small>
                     </div>
+                    <div id="settings-external-checks" class="external-status-checks" aria-label="外置代理状态"></div>
                     <div class="proxy-client-actions">
                       <button id="toggle-external-proxy" class="button primary" type="button">启动</button>
                       <button id="choose-proxy-client" class="button ghost" type="button">选择客户端</button>
-                      <button id="detect-proxy-client" class="button ghost" type="button">刷新状态</button>
+                      <button id="detect-proxy-client" class="button ghost" type="button">一键修复</button>
                       <button id="toggle-proxy-advanced" class="button ghost" type="button" aria-expanded="false">高级设置</button>
                     </div>
                     <div id="proxy-advanced-settings" class="proxy-advanced-settings" hidden>
@@ -286,7 +288,19 @@
                       </label>
                       <label class="settings-field">
                         <span>访问密钥</span>
-                        <input id="settings-mihomo-secret" type="password" placeholder="未设置则留空">
+                        <div class="settings-input-shell">
+                          <input id="settings-mihomo-secret" type="password" placeholder="未设置则留空">
+                          <button
+                            id="toggle-settings-mihomo-secret"
+                            class="input-visibility-toggle"
+                            type="button"
+                            aria-label="显示访问密钥"
+                            aria-pressed="false"
+                            title="显示访问密钥"
+                          >
+                            <span class="json-button-icon json-button-icon-eye" aria-hidden="true"></span>
+                          </button>
+                        </div>
                       </label>
                       <label class="settings-field wide">
                         <span>Merge 配置路径</span>
@@ -682,7 +696,7 @@
             <span>01</span>
             <div>
               <strong>准备代理服务 <em class="guide-step-state">待检查</em></strong>
-              <p>默认使用外部代理客户端。首次使用先到系统设置选择 Clash Verge Rev，或改用内置 Mihomo 并填写订阅地址。</p>
+              <p>默认使用外部代理客户端。首次使用先到系统设置选择 Clash Verge Rev，确认已导入订阅，并在客户端里开启 external-controller；也可以改用内置 Mihomo 并填写订阅地址。</p>
             </div>
             <button class="guide-step-action page-jump-button" type="button" data-target-page="settings" data-target-action="proxy-settings">去设置</button>
           </article>
@@ -718,6 +732,57 @@
             </div>
             <button class="guide-step-action page-jump-button" type="button" data-target-page="settings" data-target-action="agent-settings">去设置</button>
           </article>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="external-controller-guide-dialog">
+      <form class="dialog-card guide-dialog-card external-controller-guide-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">External Controller</p>
+            <h3>开启外部控制</h3>
+          </div>
+          <button id="close-external-controller-guide-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="external-controller-guide-copy">
+          <p>MD-Browser 需要通过 Clash Verge Rev 的本地控制接口读取节点、测速，并把浏览器配置绑定到具体节点。这个接口默认可能未开启，需要在 Clash Verge Rev 里手动打开一次。</p>
+        </div>
+        <div class="guide-steps external-controller-guide-steps">
+          <article>
+            <span>01</span>
+            <div>
+              <strong>打开 Clash Verge Rev</strong>
+              <p>先确认客户端已经启动，并且当前有可用订阅和节点。</p>
+            </div>
+          </article>
+          <article>
+            <span>02</span>
+            <div>
+              <strong>开启 external-controller</strong>
+              <p>进入 Clash Verge Rev 的设置或控制页，开启本地控制接口。若可填写地址，建议使用 <code>127.0.0.1:9097</code>。</p>
+            </div>
+          </article>
+          <article>
+            <span>03</span>
+            <div>
+              <strong>如设置了 secret，同步到这里</strong>
+              <p>如果 Clash Verge Rev 为 external-controller 配置了访问密钥，请在 MD-Browser 的外部代理高级设置里填写同一个值。</p>
+            </div>
+          </article>
+          <article>
+            <span>04</span>
+            <div>
+              <strong>回到 MD-Browser 重新检测</strong>
+              <p>开启完成后，点击外部代理卡片里的“一键修复”，状态会自动重新检测。</p>
+            </div>
+          </article>
+        </div>
+        <div class="dialog-actions">
+          <button id="jump-proxy-advanced-from-guide" class="button ghost" type="button">去设置</button>
+          <button id="retry-external-controller-from-guide" class="button primary" type="button">我已开启，去重试</button>
         </div>
       </form>
     </dialog>

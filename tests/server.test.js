@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { autoRepairLaunchRoute, buildSupportBundle, checkForUpdate, compareVersions, createAppServer, appInfo, defaultUpdateManifestUrl, enableEmbeddedMihomo, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, parseChangelogMarkdown, repairEmbeddedMihomo, resolveReleaseDownloadLink, safeReloadConfig, sanitizeConfigForSupport } from "../src/server.js";
+import { autoRepairLaunchRoute, buildSupportBundle, checkForUpdate, compareVersions, createAppServer, appInfo, defaultUpdateManifestUrl, enableEmbeddedMihomo, launchRouteAndConfirm, maybeAutoStartEmbeddedMihomo, parseChangelogMarkdown, repairEmbeddedMihomo, repairExternalProxy, resolveReleaseDownloadLink, safeReloadConfig, sanitizeConfigForSupport } from "../src/server.js";
 import { defaultConfig, loadConfig, saveConfig } from "../src/config.js";
 
 test("appInfo reads package metadata for version display", () => {
@@ -771,6 +771,97 @@ test("repairEmbeddedMihomo restarts broken process and reinstalls after start fa
   ]);
   assert.deepEqual(result.actions, ["restart", "reinstall", "start"]);
   assert.equal(result.started, true);
+});
+
+test("repairExternalProxy switches to external mode, fills detected Clash defaults, and reports external control connectivity issues", async () => {
+  let currentConfig = {
+    proxyClient: { mode: "none" },
+    mihomo: {
+      controllerUrl: "",
+      secret: "",
+      mergePath: "",
+      runtimePath: ""
+    }
+  };
+  const calls = [];
+
+  const result = await repairExternalProxy(currentConfig, {
+    listClientsImpl: () => [{
+      id: "clash-verge-rev",
+      label: "Clash Verge Rev",
+      installed: true,
+      appInstalled: true,
+      controllerUrl: "http://127.0.0.1:9097",
+      mergePath: "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/profiles/Merge.yaml",
+      runtimePath: "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml"
+    }],
+    updateSettingsImpl: (patch) => {
+      currentConfig = {
+        ...currentConfig,
+        proxyClient: { ...currentConfig.proxyClient, ...(patch.proxyClient || {}) },
+        mihomo: { ...currentConfig.mihomo, ...(patch.mihomo || {}) }
+      };
+      calls.push(["patch", patch]);
+      return currentConfig;
+    },
+    openAppImpl: () => {
+      calls.push(["open-app"]);
+      return { opened: true, appPath: "/Applications/Clash Verge Rev.app" };
+    },
+    probeExternalImpl: async () => ({
+      connected: false,
+      nodeCount: 0,
+      error: "Mihomo API connection failed: fetch failed"
+    }),
+    pathExistsImpl: (path) => path.endsWith("Merge.yaml") || path.endsWith("clash-verge.yaml")
+  });
+
+  assert.equal(result.config.proxyClient.mode, "external");
+  assert.equal(result.config.mihomo.controllerUrl, "http://127.0.0.1:9097");
+  assert.equal(result.actions.some((item) => item.key === "switch-mode"), true);
+  assert.equal(result.actions.some((item) => item.key === "fill-controller"), true);
+  assert.equal(result.actions.some((item) => item.key === "open-app"), true);
+  assert.equal(result.checks.find((item) => item.key === "controller").status, "fail");
+  assert.equal(result.checks.find((item) => item.key === "mergePath").status, "pass");
+  assert.equal(result.checks.find((item) => item.key === "runtimePath").status, "pass");
+  assert.match(result.summary, /外部控制/);
+  assert.equal(calls[0][0], "patch");
+});
+
+test("repairExternalProxy reports invalid access secret explicitly", async () => {
+  const result = await repairExternalProxy({
+    proxyClient: { mode: "external" },
+    mihomo: {
+      controllerUrl: "http://127.0.0.1:9097",
+      secret: "bad-token",
+      mergePath: "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/profiles/Merge.yaml",
+      runtimePath: "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml"
+    }
+  }, {
+    listClientsImpl: () => [{
+      id: "clash-verge-rev",
+      label: "Clash Verge Rev",
+      installed: true,
+      appInstalled: true,
+      controllerUrl: "http://127.0.0.1:9097",
+      mergePath: "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/profiles/Merge.yaml",
+      runtimePath: "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml"
+    }],
+    updateSettingsImpl: () => {
+      throw new Error("should not patch");
+    },
+    openAppImpl: () => ({ opened: true, appPath: "/Applications/Clash Verge Rev.app" }),
+    probeExternalImpl: async () => ({
+      connected: false,
+      nodeCount: 0,
+      error: "Mihomo API failed: 401 Unauthorized. 请检查外部代理客户端的访问密钥。"
+    }),
+    pathExistsImpl: () => true
+  });
+
+  assert.equal(result.healthy, false);
+  assert.equal(result.checks.find((item) => item.key === "secret").status, "fail");
+  assert.match(result.summary, /访问密钥/);
 });
 
 test("embedded enable endpoint switches active proxy mode to embedded", async () => {

@@ -55,7 +55,8 @@ export function loadConfig(options = {}) {
   if (!existsSync(path) && existsSync(legacyPath)) {
     mkdirSync(dirname(path), { recursive: true });
     backupConfigFile(legacyPath, { reason: "legacy-backup", now: options.now });
-    writeFileSync(path, readFileSync(legacyPath, "utf8"));
+    const migrated = migrateLegacyConfig(JSON.parse(readFileSync(legacyPath, "utf8")));
+    writeFileSync(path, `${JSON.stringify(migrated, null, 2)}\n`);
   }
   if (!existsSync(path)) {
     mkdirSync(dirname(path), { recursive: true });
@@ -75,6 +76,26 @@ export function loadConfig(options = {}) {
     routes: normalizeRoutes(parsed),
     userDataRoots: normalizeUserDataRoots(parsed)
   };
+}
+
+function migrateLegacyConfig(parsed = {}) {
+  const next = structuredClone(parsed);
+  if (next.userDataRoots) {
+    next.userDataRoots = normalizeUserDataRoots(next);
+  }
+  if (next.routes && typeof next.routes === "object") {
+    next.routes = Object.fromEntries(
+      Object.entries(next.routes).filter(([, route]) => !isDefaultChromeUserDataDir(route?.userDataDir))
+    );
+  }
+  if (next.mihomo && typeof next.mihomo === "object") {
+    const mergePath = String(next.mihomo.mergePath || "").trim();
+    const runtimePath = String(next.mihomo.runtimePath || "").trim();
+    if (mergePath && !runtimePath) {
+      next.mihomo.runtimePath = inferRuntimePathFromMergePath(mergePath);
+    }
+  }
+  return next;
 }
 
 function timestampForBackup(now = new Date()) {
@@ -304,6 +325,15 @@ function normalizeRoutes(parsed = {}) {
       return [key, normalized];
     })
   );
+}
+
+function inferRuntimePathFromMergePath(mergePath) {
+  const value = String(mergePath || "").trim();
+  if (!value) return "";
+  if (/\/profiles\/[^/]+$/i.test(value)) {
+    return join(dirname(dirname(value)), "clash-verge.yaml");
+  }
+  return join(dirname(dirname(value)), "clash-verge.yaml");
 }
 
 function normalizeRouteInput(input = {}, options = {}) {

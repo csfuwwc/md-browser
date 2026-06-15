@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.0.3 - 2026-06-15
+
+### Changed
+
+- 外部代理客户端状态改为固定七项展示，并把 Clash Verge `external-controller` 的开启引导直接挂到状态项上。
+- 外部代理和内置 Mihomo 的状态胶囊布局重新收口，优先单行展示，空间不足时最多折成两行。
+
+### Fixed
+
+- 修复外部代理状态依赖当前激活后端导致的误判；即使当前使用内置 Mihomo，也能独立显示 Clash Verge 的真实连通状态。
+- 修复外部代理已开启 `external-controller` 时，页面仍错误显示灰色状态的问题。
+- 修复从旧版 `~/.tk-browser-router/config.json` 迁移时把默认 Chrome 路由、默认 Chrome 根目录和空 `runtimePath` 一并带入新版本的问题。
+
 ## v1.0.2 - 2026-06-15
 
 ### Changed

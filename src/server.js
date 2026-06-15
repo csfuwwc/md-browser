@@ -215,6 +215,159 @@ async function waitForExternalMihomo(mihomoConfig, { attempts = 20, intervalMs =
   return { connected: false, nodeCount: 0, error: lastError || "外部代理客户端未连接" };
 }
 
+function summarizeExternalRepair(checks = []) {
+  const failures = checks.filter((item) => item.status === "fail");
+  if (!failures.length) return "外部代理客户端已就绪。";
+  return failures.slice(0, 2).map((item) => item.message || item.label).join(" ");
+}
+
+function buildExternalCheck(key, label, status, message) {
+  return { key, label, status, message };
+}
+
+function classifyExternalProbe(externalState = {}) {
+  const error = String(externalState.error || "").trim();
+  if (!error) {
+    return {
+      controller: buildExternalCheck("controller", "外部控制", "pass", "外部控制已连接。"),
+      secret: buildExternalCheck("secret", "访问密钥", "pass", "访问密钥已通过验证。"),
+      nodes: externalState.nodeCount > 0
+        ? buildExternalCheck("nodes", "节点池", "pass", `已读取 ${externalState.nodeCount} 个节点。`)
+        : buildExternalCheck("nodes", "节点池", "fail", "外部代理已连接，但当前没有可绑定节点。请先在 Clash Verge Rev 导入订阅。")
+    };
+  }
+
+  if (/401 Unauthorized/i.test(error)) {
+    return {
+      controller: buildExternalCheck("controller", "外部控制", "pass", "外部控制端口可访问。"),
+      secret: buildExternalCheck("secret", "访问密钥", "fail", "访问密钥不匹配，请与 Clash Verge Rev 的 external-controller secret 保持一致。"),
+      nodes: buildExternalCheck("nodes", "节点池", "fail", "访问密钥校验失败，暂时无法读取节点池。")
+    };
+  }
+
+  if (/fetch failed|connection failed|ECONNREFUSED|ETIMEDOUT|ENOTFOUND/i.test(error)) {
+    return {
+      controller: buildExternalCheck("controller", "外部控制", "fail", "外部控制未连通，请确认 Clash Verge Rev 已启动并开启 external-controller。"),
+      secret: buildExternalCheck("secret", "访问密钥", "warn", "待外部控制连通后再验证访问密钥。"),
+      nodes: buildExternalCheck("nodes", "节点池", "fail", "外部控制未连通，当前无法读取节点池。")
+    };
+  }
+
+  return {
+    controller: buildExternalCheck("controller", "外部控制", "fail", error),
+    secret: buildExternalCheck("secret", "访问密钥", "warn", "待外部控制恢复后再验证访问密钥。"),
+    nodes: buildExternalCheck("nodes", "节点池", "fail", "当前无法读取节点池。")
+  };
+}
+
+export async function repairExternalProxy(config, {
+  listClientsImpl = listExternalProxyClientCandidates,
+  updateSettingsImpl = updateSystemSettings,
+  openAppImpl = openExternalProxyApp,
+  probeExternalImpl = waitForExternalMihomo,
+  pathExistsImpl = existsSync
+} = {}) {
+  let nextConfig = config;
+  const actions = [];
+  const clients = listClientsImpl(config.mihomo || {});
+  const selectedClient = clients.find((client) => client.installed) || clients[0] || null;
+  const mihomoPatch = {};
+  const currentMihomo = nextConfig.mihomo || {};
+
+  if (selectedClient?.controllerUrl && !String(currentMihomo.controllerUrl || "").trim()) {
+    mihomoPatch.controllerUrl = selectedClient.controllerUrl;
+    actions.push({ key: "fill-controller", label: "补齐控制地址" });
+  }
+  if (selectedClient?.mergePath && !String(currentMihomo.mergePath || "").trim()) {
+    mihomoPatch.mergePath = selectedClient.mergePath;
+    actions.push({ key: "fill-merge-path", label: "补齐 Merge 配置路径" });
+  }
+  if (selectedClient?.runtimePath && !String(currentMihomo.runtimePath || "").trim()) {
+    mihomoPatch.runtimePath = selectedClient.runtimePath;
+    actions.push({ key: "fill-runtime-path", label: "补齐运行配置路径" });
+  }
+  if (Object.keys(mihomoPatch).length) {
+    nextConfig = updateSettingsImpl({ mihomo: mihomoPatch });
+  }
+
+  if (nextConfig.proxyClient?.mode !== "external") {
+    nextConfig = updateSettingsImpl({ proxyClient: { mode: "external" } });
+    actions.push({ key: "switch-mode", label: "切换到外部代理模式" });
+  }
+
+  let openResult = { opened: false, reason: "app-not-found" };
+  if (selectedClient?.appInstalled) {
+    openResult = openAppImpl();
+    if (openResult.opened) {
+      actions.push({ key: "open-app", label: "启动 Clash Verge Rev" });
+    }
+  }
+
+  const controllerUrl = String(nextConfig.mihomo?.controllerUrl || "").trim();
+  const mergePath = nextConfig.mihomo?.mergePath ? expandHome(nextConfig.mihomo.mergePath) : "";
+  const runtimePath = nextConfig.mihomo?.runtimePath ? expandHome(nextConfig.mihomo.runtimePath) : "";
+  const checks = [
+    buildExternalCheck("client", "客户端安装", selectedClient?.appInstalled ? "pass" : "fail", selectedClient?.appInstalled ? "已检测到外部代理客户端。" : "未检测到 Clash Verge Rev，请先安装并启动。"),
+    buildExternalCheck("controllerUrl", "控制地址", controllerUrl ? "pass" : "fail", controllerUrl ? `当前控制地址：${controllerUrl}` : "未配置控制地址。"),
+    buildExternalCheck("mergePath", "Merge 配置路径", mergePath && pathExistsImpl(mergePath) ? "pass" : "fail", mergePath ? (pathExistsImpl(mergePath) ? "Merge 配置文件存在。" : "未找到 Merge 配置文件，请确认 Clash Verge Rev 已初始化。") : "未配置 Merge 配置路径。"),
+    buildExternalCheck("runtimePath", "运行配置路径", runtimePath && pathExistsImpl(runtimePath) ? "pass" : "fail", runtimePath ? (pathExistsImpl(runtimePath) ? "运行配置文件存在。" : "未找到运行配置文件，请确认 Clash Verge Rev 已正常生成配置。") : "未配置运行配置路径。")
+  ];
+
+  let externalState = { connected: false, nodeCount: 0, error: "" };
+  if (controllerUrl) {
+    externalState = await probeExternalImpl(nextConfig.mihomo);
+  }
+  const probeChecks = classifyExternalProbe(externalState);
+  checks.push(probeChecks.controller, probeChecks.secret, probeChecks.nodes);
+
+  const healthy = checks.every((item) => item.status !== "fail");
+  return {
+    config: nextConfig,
+    repaired: actions.length > 0,
+    healthy,
+    actions,
+    checks,
+    external: {
+      ...externalState,
+      ...openResult,
+      controllerUrl,
+      mergePath,
+      runtimePath
+    },
+    summary: summarizeExternalRepair(checks)
+  };
+}
+
+export async function externalProxyStatus(config) {
+  const clients = listExternalProxyClientCandidates(config.mihomo || {});
+  const selectedClient = clients.find((client) => client.appInstalled || client.installed) || clients[0] || null;
+  const controllerUrl = String(config.mihomo?.controllerUrl || "").trim();
+  const mergePath = config.mihomo?.mergePath ? expandHome(config.mihomo.mergePath) : "";
+  const runtimePath = config.mihomo?.runtimePath ? expandHome(config.mihomo.runtimePath) : "";
+
+  const checks = [
+    buildExternalCheck("client", "客户端安装", selectedClient?.appInstalled ? "pass" : "fail", selectedClient?.appInstalled ? "已检测到外部代理客户端。" : "未检测到 Clash Verge Rev，请先安装并启动。"),
+    buildExternalCheck("controllerUrl", "控制地址", controllerUrl ? "pass" : "fail", controllerUrl ? `当前控制地址：${controllerUrl}` : "未配置控制地址。"),
+    buildExternalCheck("mergePath", "Merge 配置路径", mergePath && existsSync(mergePath) ? "pass" : "fail", mergePath ? (existsSync(mergePath) ? "Merge 配置文件存在。" : "未找到 Merge 配置文件，请确认 Clash Verge Rev 已初始化。") : "未配置 Merge 配置路径。"),
+    buildExternalCheck("runtimePath", "运行配置路径", runtimePath && existsSync(runtimePath) ? "pass" : "fail", runtimePath ? (existsSync(runtimePath) ? "运行配置文件存在。" : "未找到运行配置文件，请确认 Clash Verge Rev 已正常生成配置。") : "未配置运行配置路径。")
+  ];
+
+  let external = { connected: false, nodeCount: 0, error: controllerUrl ? "外部代理客户端未连接" : "未配置控制地址" };
+  if (controllerUrl) {
+    external = await waitForExternalMihomo(config.mihomo, { attempts: 1, intervalMs: 0 });
+  }
+  const probeChecks = classifyExternalProbe(external);
+  checks.push(probeChecks.controller, probeChecks.secret, probeChecks.nodes);
+
+  return {
+    connected: external.connected === true,
+    nodeCount: Number(external.nodeCount || 0),
+    error: external.error || "",
+    checks,
+    summary: summarizeExternalRepair(checks)
+  };
+}
+
 async function startExternalProxy(config) {
   if (config.proxyClient?.mode === "embedded") {
     try {
@@ -719,6 +872,10 @@ async function handleApi(req, res) {
     });
   }
 
+  if (req.method === "GET" && url.pathname === "/api/external-proxy/status") {
+    return sendJson(res, 200, await externalProxyStatus(config));
+  }
+
   if (req.method === "GET" && url.pathname === "/api/embedded-mihomo/status") {
     return sendJson(res, 200, await embeddedMihomoStatus(config.embeddedMihomo));
   }
@@ -755,6 +912,10 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/external-proxy/start") {
     return sendJson(res, 200, await startExternalProxy(config));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/external-proxy/repair") {
+    return sendJson(res, 200, await repairExternalProxy(config));
   }
 
   if (req.method === "POST" && url.pathname === "/api/external-proxy/stop") {

@@ -42,11 +42,27 @@ test("loadConfig migrates legacy tk-browser-router config to MD-Browser path", (
     writeFileSync(legacyPath, `${JSON.stringify({
       version: 1,
       proxyClient: { mode: "external" },
+      userDataRoots: [
+        "/Users/example/Library/Application Support/Google/Chrome",
+        "~/Library/Application Support/MD-Browser/Profiles"
+      ],
+      mihomo: {
+        controllerUrl: "http://127.0.0.1:9097",
+        mergePath: "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/profiles/Merge.yaml",
+        runtimePath: ""
+      },
       routes: {
         old: {
           label: "Legacy Route",
           cdpPort: 9222,
           proxyUrl: "http://127.0.0.1:18101"
+        },
+        chrome: {
+          label: "Default Chrome",
+          cdpPort: 9223,
+          proxyUrl: "http://127.0.0.1:18102",
+          userDataDir: "/Users/example/Library/Application Support/Google/Chrome",
+          profileDirectory: "Default"
         }
       }
     }, null, 2)}\n`);
@@ -56,6 +72,12 @@ test("loadConfig migrates legacy tk-browser-router config to MD-Browser path", (
     const backupPath = join(dir, ".tk-browser-router/config.legacy-backup.20260612070809.json");
 
     assert.equal(config.routes.old.label, "Legacy Route");
+    assert.equal(config.routes.chrome, undefined);
+    assert.deepEqual(config.userDataRoots, ["~/Library/Application Support/MD-Browser/Profiles"]);
+    assert.equal(
+      config.mihomo.runtimePath,
+      "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml"
+    );
     assert.equal(existsSync(migratedPath), true);
     assert.equal(JSON.parse(readFileSync(migratedPath, "utf8")).routes.old.label, "Legacy Route");
     assert.equal(existsSync(legacyPath), true);

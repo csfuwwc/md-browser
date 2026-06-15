@@ -34,6 +34,9 @@ let latestUpdateResult = null;
 let changelogEntries = [];
 let updateAutoCheckInFlight = false;
 let pendingDeleteRouteDialogResolve = null;
+let latestExternalRepairResult = null;
+let latestExternalProxyClients = [];
+let latestExternalProxyStatus = null;
 
 const PAGE_META = {
   dashboard: { eyebrow: "Local Browser Router", title: "仪表盘" },
@@ -631,15 +634,184 @@ function renderProxyClientState({ connected, nodeCount = 0, detail = "" }) {
     return;
   }
   const proxyMode = currentProxyMode();
-  const controllerUrl = currentConfig?.mihomo?.controllerUrl;
   const externalActive = proxyMode === "external";
-  const isConnected = externalActive && connected;
-  state.dataset.state = isConnected ? "online" : "offline";
-  state.textContent = isConnected ? "已连接" : externalActive ? "未连接" : "未启动";
-  detailNode.textContent = isConnected
-    ? `节点池 ${nodeCount} 个`
-    : detail || (proxyMode === "external" ? "未连接，可选择客户端或检查高级设置。" : "点击启动后使用外部代理。");
+  const externalConnected = latestExternalProxyStatus?.connected ?? connected;
+  const detectedClient = latestExternalProxyClients.find((client) => client.appInstalled || client.installed) || latestExternalProxyClients[0] || null;
+  state.dataset.state = externalConnected ? "online" : externalActive ? "offline" : "checking";
+  state.textContent = externalConnected ? "已连接" : externalActive ? "未连接" : "未启用";
+  const resolvedNodeCount = Number.isFinite(latestExternalProxyStatus?.nodeCount) ? latestExternalProxyStatus.nodeCount : nodeCount;
+  detailNode.textContent = externalConnected
+    ? `节点池 ${resolvedNodeCount} 个`
+    : externalActive
+      ? detectedClient?.appInstalled
+        ? "已检测到 Clash Verge Rev，本机控制接口暂未连通。"
+        : "当前未检测到可用的外部代理客户端。"
+      : "点击启动后使用外部代理。";
+  renderExternalProxyChecks({ connected, nodeCount, detail });
   renderProxyServiceCards();
+}
+
+function syncPasswordVisibilityToggle(inputSelector, buttonSelector) {
+  const input = document.querySelector(inputSelector);
+  const button = document.querySelector(buttonSelector);
+  if (!input || !button) return;
+  const visible = input.type === "text";
+  button.setAttribute("aria-pressed", visible ? "true" : "false");
+  button.setAttribute("aria-label", visible ? "隐藏访问密钥" : "显示访问密钥");
+  button.setAttribute("title", visible ? "隐藏访问密钥" : "显示访问密钥");
+}
+
+function togglePasswordVisibility(inputSelector, buttonSelector) {
+  const input = document.querySelector(inputSelector);
+  if (!input) return;
+  input.type = input.type === "password" ? "text" : "password";
+  syncPasswordVisibilityToggle(inputSelector, buttonSelector);
+}
+
+function openExternalControllerGuideDialog() {
+  document.querySelector("#external-controller-guide-dialog")?.showModal();
+}
+
+function closeExternalControllerGuideDialog() {
+  document.querySelector("#external-controller-guide-dialog")?.close();
+}
+
+function jumpToProxyAdvancedSettings() {
+  closeExternalControllerGuideDialog();
+  window.location.hash = "settings";
+  window.setTimeout(() => {
+    setProxyAdvancedExpanded(true);
+    document.querySelector("#proxy-settings-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 80);
+}
+
+function orderedExternalProxyChecks({ connected = false, nodeCount = 0, detectedClient = null, checks = [] } = {}) {
+  const checkMap = new Map((checks || []).map((check) => [check.key, check]));
+  const fallbackChecks = {
+    client: {
+      key: "client",
+      label: "客户端安装",
+      status: detectedClient?.appInstalled ? "pass" : "warn",
+      message: detectedClient?.appInstalled ? "已检测到 Clash Verge Rev。" : "请先安装并打开 Clash Verge Rev。"
+    },
+    controllerUrl: {
+      key: "controllerUrl",
+      label: "控制地址",
+      status: currentConfig?.mihomo?.controllerUrl ? "pass" : "warn",
+      message: currentConfig?.mihomo?.controllerUrl ? `当前控制地址：${currentConfig.mihomo.controllerUrl}` : "未配置控制地址。"
+    },
+    mergePath: {
+      key: "mergePath",
+      label: "Merge 配置路径",
+      status: currentConfig?.mihomo?.mergePath ? "pass" : "warn",
+      message: currentConfig?.mihomo?.mergePath ? "已配置 Merge 配置路径。" : "未配置 Merge 配置路径。"
+    },
+    runtimePath: {
+      key: "runtimePath",
+      label: "运行配置路径",
+      status: currentConfig?.mihomo?.runtimePath ? "pass" : "warn",
+      message: currentConfig?.mihomo?.runtimePath ? "已配置运行配置路径。" : "未配置运行配置路径。"
+    },
+    controller: connected
+      ? { key: "controller", label: "外部控制", status: "pass", message: "控制地址已连通，可读取 Mihomo API。" }
+      : {
+          key: "controller",
+          label: "外部控制",
+          status: "warn",
+          message: detectedClient?.appInstalled
+            ? "客户端已安装，但外部控制还未连通。请确认已开启 external-controller。"
+            : "请确认 Clash Verge Rev 已开启 external-controller。"
+        },
+    secret: connected
+      ? { key: "secret", label: "访问密钥", status: "pass", message: "访问密钥已通过验证。" }
+      : { key: "secret", label: "访问密钥", status: "warn", message: "如 Clash Verge Rev 配置了 secret，这里要填同一个值。" },
+    nodes: connected
+      ? {
+          key: "nodes",
+          label: "节点池",
+          status: nodeCount > 0 ? "pass" : "warn",
+          message: nodeCount > 0 ? `已读取 ${nodeCount} 个节点。` : "已连接，但当前没有可绑定节点。"
+        }
+      : { key: "nodes", label: "节点池", status: "warn", message: "请先在 Clash Verge Rev 导入订阅并确认节点已拉取。" }
+  };
+
+  if (detectedClient?.appInstalled) {
+    checkMap.set("client", fallbackChecks.client);
+  }
+
+  if (currentConfig?.mihomo?.controllerUrl) {
+    checkMap.set("controllerUrl", fallbackChecks.controllerUrl);
+  }
+
+  if (connected) {
+    checkMap.set("controller", fallbackChecks.controller);
+    checkMap.set("secret", fallbackChecks.secret);
+    checkMap.set("nodes", fallbackChecks.nodes);
+  }
+
+  return ["client", "controllerUrl", "mergePath", "runtimePath", "controller", "secret", "nodes"]
+    .map((key) => checkMap.get(key) || fallbackChecks[key]);
+}
+
+function renderExternalProxyChecks({ connected = false, nodeCount = 0, detail = "" } = {}) {
+  const container = document.querySelector("#settings-external-checks");
+  const nextStep = document.querySelector("#settings-external-next-step");
+  if (!container || !nextStep) return;
+  const detectedClient = latestExternalProxyClients.find((client) => client.appInstalled || client.installed) || latestExternalProxyClients[0] || null;
+  const resolvedConnected = latestExternalProxyStatus?.connected ?? connected;
+  const resolvedNodeCount = Number.isFinite(latestExternalProxyStatus?.nodeCount) ? latestExternalProxyStatus.nodeCount : nodeCount;
+  const resolvedDetail = latestExternalProxyStatus?.error || detail;
+
+  const checks = orderedExternalProxyChecks({
+    connected: resolvedConnected,
+    nodeCount: resolvedNodeCount,
+    detectedClient,
+    checks: latestExternalProxyStatus?.checks?.length
+      ? latestExternalProxyStatus.checks
+      : latestExternalRepairResult?.checks?.length ? latestExternalRepairResult.checks : []
+  });
+
+  container.innerHTML = checks.map((check) => `
+    <button
+      class="external-check-pill"
+      type="button"
+      data-ready="${check.status === "pass" ? "true" : "false"}"
+      data-check-key="${escapeHtml(check.key || "")}"
+      data-actionable="${check.key === "controller" && check.status !== "pass" ? "true" : "false"}"
+      ${check.key === "controller" && check.status !== "pass" ? `title="查看开启 external-controller 的方法" aria-label="查看开启 external-controller 的方法"` : "disabled"}
+    >
+      <i>${check.status === "pass" ? "✓" : "!"}</i>${escapeHtml(check.label || "")}
+    </button>
+  `).join("");
+
+  container.querySelectorAll('.external-check-pill[data-actionable="true"]').forEach((button) => {
+    button.addEventListener("click", openExternalControllerGuideDialog);
+  });
+
+  if (resolvedConnected) {
+    nextStep.textContent = resolvedNodeCount > 0
+      ? "外置代理已就绪，可以回到浏览器配置直接启动。"
+      : "外置代理已连通，但还没有可绑定节点。请先在 Clash Verge Rev 导入订阅。";
+    return;
+  }
+
+  if (latestExternalProxyStatus?.summary || latestExternalRepairResult?.summary) {
+    const primaryMessage = checks.find((check) => check.status === "fail")?.message
+      || checks.find((check) => check.status === "warn")?.message
+      || "";
+    const duplicateMessages = new Set([
+      String(resolvedDetail || "").trim(),
+      String(latestExternalProxyStatus?.summary || latestExternalRepairResult?.summary || "").trim(),
+      String(document.querySelector("#settings-proxy-client-detail")?.textContent || "").trim()
+    ].filter(Boolean));
+    nextStep.textContent = primaryMessage
+      && !duplicateMessages.has(String(primaryMessage).trim())
+      ? primaryMessage
+      : "";
+    return;
+  }
+
+  nextStep.textContent = resolvedDetail ? "" : "首次使用请先确认 Clash Verge Rev 已导入订阅，并开启 external-controller。";
 }
 
 function renderNodeBackendSummary({ connected = false, nodeCount = 0, error = "" } = {}) {
@@ -837,6 +1009,7 @@ async function renderProxyClientCandidates() {
   try {
     const data = await api("/api/proxy-clients");
     const clients = data.clients || [];
+    latestExternalProxyClients = clients;
     if (!clients.length) {
       container.innerHTML = `
         <div class="empty-state">
@@ -886,15 +1059,35 @@ async function renderProxyClientCandidates() {
 async function detectProxyClient() {
   const button = document.querySelector("#detect-proxy-client");
   button.disabled = true;
-  button.textContent = "刷新中...";
+  button.textContent = "修复中...";
   try {
+    if (settingsDirty) {
+      await persistSystemSettings({ refreshAfter: false, successMessage: "设置已保存，继续执行外置代理修复" });
+    }
+    const result = await api("/api/external-proxy/repair", { method: "POST" });
+    currentConfig = result.config;
+    latestExternalRepairResult = result;
+    latestExternalProxyStatus = {
+      connected: result.external?.connected === true,
+      nodeCount: Number(result.external?.nodeCount || 0),
+      error: result.external?.error || "",
+      checks: result.checks || [],
+      summary: result.summary || ""
+    };
+    (result.actions || []).forEach((action) => {
+      pushActivity("success", "外置代理自动处理", action.label);
+    });
+    (result.checks || []).filter((item) => item.status === "fail").forEach((check) => {
+      pushActivity("warn", `外置代理待处理：${check.label}`, check.message || "");
+    });
+    setSettingsHint(result.healthy ? "success" : "error", result.summary || (result.healthy ? "外置代理已就绪" : "外置代理仍有待处理项"));
     await refresh({ suppressErrorLog: true });
-    pushActivity("success", "代理客户端状态已刷新", mihomoNodes.length ? `节点 ${mihomoNodes.length} 个` : "未读取到节点");
   } catch (error) {
-    pushActivity("error", "代理客户端状态刷新失败", error.message);
+    pushActivity("error", "外置代理一键修复失败", error.message);
+    setSettingsHint("error", error.message);
   } finally {
     button.disabled = false;
-    button.textContent = "刷新状态";
+    button.textContent = "一键修复";
   }
 }
 
@@ -1738,6 +1931,10 @@ async function refresh(options = {}) {
     currentAppInfo = data.app || null;
     const diagnosticsData = await api("/api/diagnostics");
     let candidateData = await api("/api/user-data-root-candidates");
+    const proxyClientData = await api("/api/proxy-clients");
+    const externalProxyStatus = await api("/api/external-proxy/status");
+    latestExternalProxyClients = proxyClientData.clients || [];
+    latestExternalProxyStatus = externalProxyStatus || null;
     const importedCount = await autoImportRootCandidates(candidateData.candidates || []);
     if (importedCount) {
       candidateData = await api("/api/user-data-root-candidates");
@@ -2698,6 +2895,15 @@ document.querySelector("#embedded-subscription-form").addEventListener("submit",
 });
 document.querySelector("#detect-proxy-client").addEventListener("click", detectProxyClient);
 document.querySelector("#choose-proxy-client").addEventListener("click", openProxyClientDialog);
+document.querySelector("#toggle-settings-mihomo-secret").addEventListener("click", () => {
+  togglePasswordVisibility("#settings-mihomo-secret", "#toggle-settings-mihomo-secret");
+});
+document.querySelector("#close-external-controller-guide-dialog").addEventListener("click", closeExternalControllerGuideDialog);
+document.querySelector("#jump-proxy-advanced-from-guide").addEventListener("click", jumpToProxyAdvancedSettings);
+document.querySelector("#retry-external-controller-from-guide").addEventListener("click", async () => {
+  closeExternalControllerGuideDialog();
+  await detectProxyClient();
+});
 document.querySelector("#close-proxy-client-dialog").addEventListener("click", closeProxyClientDialog);
 document.querySelector("#choose-browser").addEventListener("click", openBrowserDialog);
 document.querySelector("#close-browser-dialog").addEventListener("click", closeBrowserDialog);
@@ -2854,6 +3060,7 @@ window.addEventListener("hashchange", syncPageFromHash);
 
 syncPageFromHash();
 renderSettingsBasics();
+syncPasswordVisibilityToggle("#settings-mihomo-secret", "#toggle-settings-mihomo-secret");
 setProxyAdvancedExpanded(false);
 setLocalAdvancedExpanded(false);
 renderActivityLog();
