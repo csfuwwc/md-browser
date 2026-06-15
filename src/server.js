@@ -1473,6 +1473,13 @@ export async function repairEmbeddedMihomo(config, {
 }
 
 export async function safeReloadConfig(mihomoConfig, { reloadImpl = reloadConfig } = {}) {
+  if (!mihomoConfig?.controllerUrl) {
+    return {
+      reloaded: false,
+      skipped: true,
+      error: "未启动代理服务"
+    };
+  }
   try {
     return await reloadImpl(mihomoConfig);
   } catch (error) {

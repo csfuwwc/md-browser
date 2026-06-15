@@ -617,6 +617,18 @@ test("safeReloadConfig returns reload errors without throwing", async () => {
   assert.equal(result.error, "connect ECONNREFUSED 127.0.0.1:19090");
 });
 
+test("safeReloadConfig skips reload when no proxy backend is active", async () => {
+  const result = await safeReloadConfig(null, {
+    reloadImpl: async () => {
+      throw new Error("should not run");
+    }
+  });
+
+  assert.equal(result.reloaded, false);
+  assert.equal(result.skipped, true);
+  assert.equal(result.error, "未启动代理服务");
+});
+
 test("safeReloadConfig returns successful reload result", async () => {
   const result = await safeReloadConfig({ controllerUrl: "http://127.0.0.1:19090" }, {
     reloadImpl: async () => ({ reloaded: true })
