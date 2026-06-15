@@ -33,6 +33,7 @@ let proxyOperationState = { external: "", embedded: "" };
 let latestUpdateResult = null;
 let changelogEntries = [];
 let updateAutoCheckInFlight = false;
+let pendingDeleteRouteDialogResolve = null;
 
 const PAGE_META = {
   dashboard: { eyebrow: "Local Browser Router", title: "仪表盘" },
@@ -102,6 +103,23 @@ function closeDialogCompat(selector) {
     } catch {}
   }
   dialog.removeAttribute("open");
+}
+
+function openDeleteRouteDialog(label) {
+  const name = label || "未命名配置";
+  document.querySelector("#delete-route-label").textContent = `确认删除“${name}”`;
+  openDialogCompat("#delete-route-dialog");
+  return new Promise((resolve) => {
+    pendingDeleteRouteDialogResolve = resolve;
+  });
+}
+
+function settleDeleteRouteDialog(confirmed) {
+  if (pendingDeleteRouteDialogResolve) {
+    pendingDeleteRouteDialogResolve(Boolean(confirmed));
+    pendingDeleteRouteDialogResolve = null;
+  }
+  closeDialogCompat("#delete-route-dialog");
 }
 
 async function api(path, options) {
@@ -1233,7 +1251,6 @@ function setCreateAdvancedExpanded(expanded) {
 
 function renderRoutes(routes) {
   currentRoutes = routes;
-  renderRouteIssueBanner(routes);
   const container = document.querySelector("#routes");
   const template = document.querySelector("#route-card-template");
   container.innerHTML = "";
@@ -1278,7 +1295,6 @@ function renderRoutes(routes) {
     row.querySelector(".cdp-port").textContent = route.cdpPort;
     row.querySelector(".node-name").textContent = route.nodeName || "未绑定";
     renderRouteNodeDelay(row, route);
-    row.querySelector(".start-url").textContent = route.startUrl || "https://www.google.com/";
     const launchButton = row.querySelector(".launch-route");
     const editButton = row.querySelector(".edit-route");
     const isLaunching = pendingLaunchKeys.has(route.key);
@@ -1307,28 +1323,6 @@ function renderRoutes(routes) {
 
     container.appendChild(row);
   }
-}
-
-function renderRouteIssueBanner(routes = currentRoutes) {
-  const banner = document.querySelector("#route-issue-banner");
-  if (!banner) return;
-  const routeValues = Object.values(routes || {});
-  const invalid = routeValues.filter((route) => route.nodeStatus?.valid === false && route.nodeName);
-  const unbound = routeValues.filter((route) => !route.nodeName);
-  const title = document.querySelector("#route-issue-banner-title");
-  const detail = document.querySelector("#route-issue-banner-detail");
-  if (!invalid.length && !unbound.length) {
-    banner.hidden = true;
-    return;
-  }
-  banner.hidden = false;
-  if (invalid.length) {
-    title.textContent = `${invalid.length} 条浏览器配置需要重新绑定节点`;
-    detail.textContent = "检测到已绑定节点不存在或不可用，常见于订阅切换后节点名发生变化。";
-    return;
-  }
-  title.textContent = `${unbound.length} 条浏览器配置还未绑定节点`;
-  detail.textContent = "未绑定节点的配置可以启动浏览器，但不会自动切到指定线路。";
 }
 
 function routeNodeDelayKey(route) {
@@ -2372,7 +2366,7 @@ async function createRouteConfig(event) {
 }
 
 async function deleteRouteConfig(key, label) {
-  const confirmed = window.confirm(`删除配置“${label}”后不会自动恢复。继续吗？`);
+  const confirmed = await openDeleteRouteDialog(label);
   if (!confirmed) return;
   const result = await api(`/api/routes/${encodeURIComponent(key)}`, { method: "DELETE" });
   pushActivity("warn", `已删除配置 ${label}`, "", { routeKey: key, routeLabel: label });
@@ -2792,6 +2786,9 @@ document.querySelector("#collapse-create-advanced").addEventListener("click", ()
   setCreateAdvancedExpanded(false);
 });
 document.querySelector("#cancel-create-route").addEventListener("click", closeCreateDialog);
+document.querySelector("#close-delete-route-dialog").addEventListener("click", () => settleDeleteRouteDialog(false));
+document.querySelector("#cancel-delete-route-dialog").addEventListener("click", () => settleDeleteRouteDialog(false));
+document.querySelector("#confirm-delete-route-dialog").addEventListener("click", () => settleDeleteRouteDialog(true));
 document.querySelector("#clear-activity-log").addEventListener("click", () => {
   activityLog = [];
   renderActivityLog();
@@ -2799,18 +2796,6 @@ document.querySelector("#clear-activity-log").addEventListener("click", () => {
 document.querySelector("#open-guide-dialog").addEventListener("click", openGuideDialog);
 document.querySelector("#open-guide-inline").addEventListener("click", openGuideDialog);
 document.querySelector("#close-guide-dialog").addEventListener("click", closeGuideDialog);
-document.querySelector("#route-filter-node-issues").addEventListener("click", () => {
-  routeStateFilter = "node-issue";
-  document.querySelector("#route-state-filter").value = "node-issue";
-  renderRoutes(currentRoutes);
-});
-document.querySelector("#route-clear-filters").addEventListener("click", () => {
-  routeStateFilter = "all";
-  routeSearchQuery = "";
-  document.querySelector("#route-state-filter").value = "all";
-  document.querySelector("#route-search").value = "";
-  renderRoutes(currentRoutes);
-});
 document.querySelectorAll(".activity-filter-chip").forEach((button) => {
   button.addEventListener("click", () => setActivityCategoryFilter(button.dataset.category || "all"));
 });

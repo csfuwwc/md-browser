@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="md-browser-service-url" content="http://127.0.0.1:18777">
     <title>MD-Browser</title>
-    <link rel="stylesheet" href="/styles.css?v=94">
+    <link rel="stylesheet" href="/styles.css?v=95">
   </head>
   <body>
     <main class="shell">
@@ -157,16 +157,6 @@
                 <button id="create-route" class="icon-button action-tool-button action-tool-button-primary" type="button" aria-label="添加配置" data-tooltip="添加配置">
                   <span class="topbar-action-icon topbar-action-icon-plus" aria-hidden="true"></span>
                 </button>
-              </div>
-            </div>
-            <div id="route-issue-banner" class="route-issue-banner" hidden>
-              <div class="route-issue-banner-copy">
-                <strong id="route-issue-banner-title">存在需要处理的节点绑定</strong>
-                <span id="route-issue-banner-detail">部分浏览器配置绑定的节点已失效，需要重新选择可用节点。</span>
-              </div>
-              <div class="route-issue-banner-actions">
-                <button id="route-filter-node-issues" class="button ghost" type="button">只看异常</button>
-                <button id="route-clear-filters" class="button ghost" type="button">查看全部</button>
               </div>
             </div>
             <section id="routes" class="route-list" aria-label="browser environments"></section>
@@ -525,7 +515,10 @@
             <span class="country-code"></span>
           </div>
           <div class="route-title">
-            <h3 class="route-label"></h3>
+            <div class="route-title-top">
+              <h3 class="route-label"></h3>
+              <span class="state-pill"><span></span></span>
+            </div>
             <p class="route-country"></p>
             <div class="route-tags"></div>
           </div>
@@ -538,20 +531,15 @@
               <div class="node-caption-row">
                 <span>绑定节点</span>
                 <button class="node-delay-button" type="button">测速</button>
+                <small class="node-delay-result" data-state="idle">未测速</small>
               </div>
               <div class="node-cell-main">
                 <strong class="node-name"></strong>
-                <small class="node-delay-result" data-state="idle">未测速</small>
               </div>
-            </div>
-            <div class="row-cell wide route-cell-start-url">
-              <span>默认启动网址</span>
-              <strong class="start-url"></strong>
             </div>
           </div>
           <div class="route-state-stack">
             <div class="route-issues"></div>
-            <span class="state-pill"><span></span></span>
           </div>
           <div class="row-actions">
             <button class="icon-button action-tool-button action-tool-button-primary launch-route" type="button" aria-label="启动浏览器" data-tooltip="启动浏览器">
@@ -653,6 +641,27 @@
         <div class="dialog-actions">
           <button id="cancel-create-route" class="button ghost" value="cancel" type="button">取消</button>
           <button id="create-submit" class="button primary" value="default" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="delete-route-dialog">
+      <form class="dialog-card delete-route-dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h3>删除浏览器配置</h3>
+          </div>
+          <button id="close-delete-route-dialog" class="icon-button" value="cancel" type="button" aria-label="关闭">
+            <span class="lucide-icon lucide-x-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="delete-route-copy">
+          <strong id="delete-route-label">这条配置将被删除</strong>
+          <p>删除后不会自动恢复，关联的浏览器配置记录会立即从当前设备移除。</p>
+        </div>
+        <div class="dialog-actions">
+          <button id="cancel-delete-route-dialog" class="button ghost" value="cancel" type="button">取消</button>
+          <button id="confirm-delete-route-dialog" class="button danger" value="default" type="button">删除配置</button>
         </div>
       </form>
     </dialog>
