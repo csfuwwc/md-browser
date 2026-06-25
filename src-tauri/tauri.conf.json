@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "MD-Browser",
-  "version": "1.1.2",
+  "version": "1.2.1",
   "identifier": "com.local.md-browser",
   "build": {
     "frontendDist": "../dist-tauri/web",
